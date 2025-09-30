@@ -43,6 +43,19 @@ if (!config.botUsername || !config.botOauth || !config.channel || !config.adminK
   process.exit(1);
 }
 
+// Validate OAuth token format
+if (!config.botOauth.startsWith('oauth:')) {
+  console.error('BOT_OAUTH must start with "oauth:". Current value:', config.botOauth);
+  process.exit(1);
+}
+
+// Log configuration (without sensitive data)
+console.log('Bot Configuration:');
+console.log('- Username:', config.botUsername);
+console.log('- Channel:', config.channel);
+console.log('- OAuth Token:', config.botOauth.substring(0, 10) + '...');
+console.log('- Port:', config.expressPort);
+
 // Initialize database
 const dbPath = path.join(__dirname, 'activity.db');
 const db = new sqlite3.Database(dbPath, (err) => {
@@ -60,14 +73,14 @@ initDb();
 // Twitch Bot Configuration
 const client = new tmi.Client({
   options: { 
-    debug: false,
-    messagesLogLevel: 'warn'
+    debug: true,
+    messagesLogLevel: 'info'
   },
   connection: {
     reconnect: true,
     secure: true,
     server: 'irc.chat.twitch.tv',
-    port: 443,
+    port: 6667,
     timeout: 30000
   },
   identity: {
