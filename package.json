@@ -14,7 +14,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "twitch-js": "^2.0.0-beta.39",
+    "twitch-chat-client": "^1.0.0",
     "sqlite3": "^5.1.2",
     "express": "^4.18.2",
     "cors": "^2.8.5",

@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Chat } = require('twitch-js');
+const { ChatClient } = require('twitch-chat-client');
 const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
@@ -70,11 +70,17 @@ const db = new sqlite3.Database(dbPath, (err) => {
 const initDb = require('./migrations/init_db');
 initDb();
 
-// Twitch-js Chat Configuration
-const chat = new Chat({
-  username: config.botUsername,
-  token: config.botOauth.substring(6), // Remove 'oauth:' prefix
-  channels: [config.channel]
+// Twitch Chat Client Configuration
+const chatClient = new ChatClient({
+  authProvider: {
+    getAccessToken: async () => config.botOauth.substring(6), // Remove 'oauth:' prefix
+    getAppAccessToken: async () => null,
+    getClientId: async () => config.twitchClientId
+  },
+  channels: [config.channel],
+  logger: {
+    minLevel: 'info'
+  }
 });
 
 // Debug: Check if token and username are properly set
@@ -83,6 +89,7 @@ console.log('- Username:', config.botUsername);
 console.log('- Token (first 10 chars):', config.botOauth.substring(6, 16));
 console.log('- Channel:', config.channel);
 console.log('- Token length:', config.botOauth.substring(6).length);
+console.log('- Client ID:', config.twitchClientId);
 
 // Express app setup
 const app = express();
@@ -572,13 +579,12 @@ app.post('/api/admin/end-month', requireAdmin, async (req, res) => {
 });
 
 // Chat command handlers
-async function handleChatMessage(msg) {
-  const username = msg.username;
-  const displayName = msg.tags.displayName || username;
-  const isMod = msg.tags.mod === '1' || msg.tags.userType === 'mod';
-  const isBroadcaster = msg.tags.broadcaster === '1';
+async function handleChatMessage({ channel, user, message, msg }) {
+  const username = user;
+  const displayName = msg.userInfo.displayName || username;
+  const isMod = msg.userInfo.isMod;
+  const isBroadcaster = msg.userInfo.isBroadcaster;
   const isAdmin = isMod || isBroadcaster;
-  const message = msg.message;
   
   // Update user presence
   const now = getCurrentTimestamp();
@@ -1054,13 +1060,13 @@ function runMonthlyJob() {
   );
 }
 
-// Helper function to send messages using twitch-js API
+// Helper function to send messages using twitch-chat-client API
 async function sendChatMessage(message) {
   console.log('🔍 sendChatMessage called with:', message);
   try {
-    // Use the correct twitch-js method for sending messages
+    // Use the correct twitch-chat-client method for sending messages
     console.log('🔍 Sending message to channel:', config.channel);
-    await chat.say(`#${config.channel}`, message);
+    await chatClient.say(config.channel, message);
     console.log('✅ Message sent successfully');
     return true;
   } catch (error) {
@@ -1071,24 +1077,18 @@ async function sendChatMessage(message) {
 }
 
 // Event handlers
-chat.on('PRIVMSG', handleChatMessage);
-
-// Try multiple event names for connection
-chat.on('connected', () => {
-  console.log(`✅ Connected to Twitch IRC (connected event)`);
-  sendChatMessage('Bot ist online! 🚀');
+chatClient.onMessage(async (channel, user, message, msg) => {
+  await handleChatMessage({ channel, user, message, msg });
 });
 
-chat.on('CONNECTED', async () => {
-  console.log(`✅ Connected to Twitch IRC (CONNECTED event)`);
+chatClient.onConnect(async () => {
+  console.log(`✅ Connected to Twitch Chat!`);
   await sendChatMessage('Bot ist online! 🚀');
 });
 
-// Also try to send message after a delay
-setTimeout(async () => {
-  console.log('🔍 Trying to send delayed message...');
-  await sendChatMessage('Bot ist online! 🚀');
-}, 3000);
+chatClient.onDisconnect(() => {
+  console.log(`❌ Disconnected from Twitch Chat!`);
+});
 
 // Start viewtime tracking
 setInterval(updateViewtime, config.heartbeatSeconds * 1000);
@@ -1106,14 +1106,14 @@ app.listen(config.expressPort, '0.0.0.0', () => {
 });
 
 // Connect to Twitch
-chat.connect();
+chatClient.connect();
 
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('Shutting down...');
-  chat.disconnect();
+  chatClient.disconnect();
   db.close();
   process.exit(0);
 });
 
-module.exports = { app, chat, db };
+module.exports = { app, chatClient, db };
