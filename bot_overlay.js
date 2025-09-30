@@ -764,10 +764,10 @@ cron.schedule('0 0 1 * *', runMonthlyJob, {
 });
 
 // Start Express server
-app.listen(config.expressPort, () => {
+app.listen(config.expressPort, '0.0.0.0', () => {
   console.log(`Express server running on port ${config.expressPort}`);
-  console.log(`Overlay URL: http://localhost:${config.expressPort}/overlay.html`);
-  console.log(`Admin Dashboard: http://localhost:${config.expressPort}/admin/clips.html?admin_key=${config.adminKey}`);
+  console.log(`Overlay URL: http://0.0.0.0:${config.expressPort}/overlay.html`);
+  console.log(`Admin Dashboard: http://0.0.0.0:${config.expressPort}/admin/clips.html?admin_key=${config.adminKey}`);
 });
 
 // Connect to Twitch
