@@ -273,11 +273,13 @@
         // Load leaderboard
         async function loadLeaderboard() {
             try {
-                const response = await fetch('https://einfachsven.xyz/api/leaderboard?limit=8');
+                const response = await fetch('https://einfachsven.xyz/api/leaderboard');
                 const data = await response.json();
                 
-                if (data.ok && data.leaderboard) {
-                    displayLeaderboard(data.leaderboard);
+                if (data.top) {
+                    // Limit to top 8 for panel display
+                    const top8 = data.top.slice(0, 8);
+                    displayLeaderboard(top8);
                 } else {
                     throw new Error('Invalid response format');
                 }
