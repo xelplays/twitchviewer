@@ -961,7 +961,7 @@ function validateClipOwnership(clipUrl, username) {
   return true; // Allow all for testing
 }
 
-// Viewtime tracking - disabled for testing
+// Enhanced viewtime tracking - checks both chat activity and viewer list
 async function updateViewtime() {
   const enableViewtimePoints = false; // Set to true to enable viewtime points
   
@@ -970,35 +970,93 @@ async function updateViewtime() {
   }
   
   try {
-    const timeout = getCurrentTimestamp() - config.presenceTimeoutSeconds;
+    // Get users who have been active in chat (written at least once)
+    const chatActiveUsers = await getChatActiveUsers();
     
-    db.all('SELECT * FROM points WHERE last_seen_ts > ?', [timeout], async (err, activeUsers) => {
-      if (err) {
-        console.error('Error fetching active users for viewtime:', err);
-        return;
+    // Get current viewers from Twitch API
+    const currentViewers = await getCurrentViewers();
+    
+    // Only track viewtime for users who:
+    // 1. Have written in chat at least once
+    // 2. Are currently in the viewer list
+    const eligibleUsers = chatActiveUsers.filter(user => 
+      currentViewers.includes(user.username.toLowerCase())
+    );
+    
+    console.log(`Tracking viewtime for ${eligibleUsers.length} users (${currentViewers.length} total viewers)`);
+    
+    for (const user of eligibleUsers) {
+      const newViewSeconds = user.view_seconds + config.heartbeatSeconds;
+      let pointsToAdd = 0;
+      let remainingViewSeconds = newViewSeconds;
+      
+      // Calculate points from viewtime
+      while (remainingViewSeconds >= config.viewtimeSecondsPerPoint) {
+        pointsToAdd += 1;
+        remainingViewSeconds -= config.viewtimeSecondsPerPoint;
       }
       
-      for (const user of activeUsers) {
-        const newViewSeconds = user.view_seconds + config.heartbeatSeconds;
-        let pointsToAdd = 0;
-        let remainingViewSeconds = newViewSeconds;
-        
-        // Calculate points from viewtime
-        while (remainingViewSeconds >= config.viewtimeSecondsPerPoint) {
-          pointsToAdd += 1;
-          remainingViewSeconds -= config.viewtimeSecondsPerPoint;
-        }
-        
-        // Update user with new viewtime and points
-        if (pointsToAdd > 0) {
-          await addPointsToUser(user.username, pointsToAdd, 'viewtime');
-        }
-        
-        await updateUser(user.username, { view_seconds: remainingViewSeconds });
+      // Update user with new viewtime and points
+      if (pointsToAdd > 0) {
+        await addPointsToUser(user.username, pointsToAdd, 'viewtime');
       }
-    });
+      
+      await updateUser(user.username, { view_seconds: remainingViewSeconds });
+    }
   } catch (error) {
     console.error('Error updating viewtime:', error);
+  }
+}
+
+// Get users who have been active in chat
+async function getChatActiveUsers() {
+  return new Promise((resolve, reject) => {
+    const timeout = getCurrentTimestamp() - config.presenceTimeoutSeconds;
+    
+    db.all('SELECT * FROM points WHERE last_seen_ts > ? AND message_count > 0', [timeout], (err, users) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(users);
+      }
+    });
+  });
+}
+
+// Get current viewers from Twitch API
+async function getCurrentViewers() {
+  try {
+    // Use Twitch Helix API to get current viewers
+    const response = await axios.get(`https://api.twitch.tv/helix/streams?user_login=${config.channel}`, {
+      headers: {
+        'Client-ID': config.twitchClientId,
+        'Authorization': `Bearer ${config.botOauth.substring(6)}`
+      }
+    });
+    
+    if (response.data.data.length === 0) {
+      console.log('Stream is offline, no viewers to track');
+      return [];
+    }
+    
+    const streamId = response.data.data[0].id;
+    
+    // Get chatters (viewers)
+    const chattersResponse = await axios.get(`https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${streamId}&moderator_id=${streamId}`, {
+      headers: {
+        'Client-ID': config.twitchClientId,
+        'Authorization': `Bearer ${config.botOauth.substring(6)}`
+      }
+    });
+    
+    const viewers = chattersResponse.data.data.map(chatter => chatter.user_login);
+    console.log(`Found ${viewers.length} current viewers`);
+    
+    return viewers;
+  } catch (error) {
+    console.error('Error fetching current viewers:', error);
+    // Fallback: use chat activity only
+    return [];
   }
 }
 
