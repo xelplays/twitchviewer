@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏆 Leaderboard & Games</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #9146ff 0%, #6441a5 100%);
+            height: 500px;
+            color: white;
+            overflow: hidden;
+        }
+
+        .container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 20px;
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 12px;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .leaderboard-section {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .leaderboard-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .leaderboard-item.rank-1 {
+            border-left-color: #ffd700;
+            background: rgba(255, 215, 0, 0.2);
+        }
+
+        .leaderboard-item.rank-2 {
+            border-left-color: #c0c0c0;
+            background: rgba(192, 192, 192, 0.2);
+        }
+
+        .leaderboard-item.rank-3 {
+            border-left-color: #cd7f32;
+            background: rgba(205, 127, 50, 0.2);
+        }
+
+        .rank {
+            font-weight: bold;
+            font-size: 14px;
+            min-width: 25px;
+        }
+
+        .rank.rank-1::before { content: "🥇"; }
+        .rank.rank-2::before { content: "🥈"; }
+        .rank.rank-3::before { content: "🥉"; }
+
+        .username {
+            flex: 1;
+            margin-left: 10px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .points {
+            font-weight: bold;
+            color: #ffd700;
+            font-size: 13px;
+        }
+
+        .games-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .games-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #ffd700;
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .game-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            padding: 8px;
+            text-align: center;
+            font-size: 11px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .game-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        .game-emoji {
+            font-size: 16px;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .error {
+            text-align: center;
+            padding: 15px;
+            background: rgba(255, 0, 0, 0.2);
+            border-radius: 8px;
+            font-size: 12px;
+        }
+
+        .user-stats {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .user-stats h3 {
+            font-size: 14px;
+            margin-bottom: 5px;
+            color: #ffd700;
+        }
+
+        .user-points {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ff6b6b;
+        }
+
+        .refresh-info {
+            text-align: center;
+            font-size: 10px;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏆 Leaderboard & Games</h1>
+            <p>Spiele mit und sammle Punkte!</p>
+        </div>
+
+        <div class="content">
+            <div class="user-stats" id="userStats" style="display: none;">
+                <h3>Deine Punkte</h3>
+                <div class="user-points" id="userPoints">0</div>
+            </div>
+
+            <div class="leaderboard-section">
+                <div class="leaderboard" id="leaderboard">
+                    <div class="loading">🔄 Lade Leaderboard...</div>
+                </div>
+            </div>
+
+            <div class="games-section">
+                <div class="games-title">🎮 Spiele & Commands</div>
+                <div class="games-grid">
+                    <div class="game-item" onclick="sendChatCommand('!dice')">
+                        <div class="game-emoji">🎲</div>
+                        <div>Dice Game</div>
+                    </div>
+                    <div class="game-item" onclick="sendChatCommand('!lottery')">
+                        <div class="game-emoji">🎟️</div>
+                        <div>Lottery</div>
+                    </div>
+                    <div class="game-item" onclick="sendChatCommand('!rps rock')">
+                        <div class="game-emoji">✂️</div>
+                        <div>Rock Paper</div>
+                    </div>
+                    <div class="game-item" onclick="sendChatCommand('!points')">
+                        <div class="game-emoji">💰</div>
+                        <div>My Points</div>
+                    </div>
+                </div>
+                <div class="refresh-info">⏰ Auto-Refresh alle 30s</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+    <script>
+        // Twitch Extension Helper
+        const twitch = window.Twitch.ext;
+
+        let refreshInterval;
+        let currentUser = null;
+
+        // Initialize Twitch Extension
+        twitch.onAuthorized((auth) => {
+            console.log('Twitch Extension authorized:', auth);
+            currentUser = auth;
+            loadUserStats(auth.userId);
+        });
+
+        // Load user stats
+        async function loadUserStats(userId) {
+            try {
+                const response = await fetch(`https://einfachsven.xyz/api/user/${userId}/stats`);
+                const data = await response.json();
+                
+                if (data.ok) {
+                    document.getElementById('userStats').style.display = 'block';
+                    document.getElementById('userPoints').textContent = data.points.toLocaleString();
+                }
+            } catch (error) {
+                console.error('Error loading user stats:', error);
+            }
+        }
+
+        // Load leaderboard
+        async function loadLeaderboard() {
+            try {
+                const response = await fetch('https://einfachsven.xyz/api/leaderboard?limit=8');
+                const data = await response.json();
+                
+                if (data.ok && data.leaderboard) {
+                    displayLeaderboard(data.leaderboard);
+                } else {
+                    throw new Error('Invalid response format');
+                }
+            } catch (error) {
+                console.error('Error loading leaderboard:', error);
+                showError();
+            }
+        }
+
+        // Display leaderboard
+        function displayLeaderboard(leaderboard) {
+            const container = document.getElementById('leaderboard');
+            
+            if (leaderboard.length === 0) {
+                container.innerHTML = '<div class="error">❌ Keine Daten verfügbar</div>';
+                return;
+            }
+
+            const html = leaderboard.map((user, index) => {
+                const rank = index + 1;
+                const rankClass = rank <= 3 ? `rank-${rank}` : '';
+                
+                return `
+                    <div class="leaderboard-item ${rankClass}">
+                        <div class="rank rank-${rank}">${rank}</div>
+                        <div class="username">${user.display_name || user.username}</div>
+                        <div class="points">${user.points.toLocaleString()}</div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = html;
+        }
+
+        // Show error
+        function showError() {
+            const container = document.getElementById('leaderboard');
+            container.innerHTML = `
+                <div class="error">
+                    ❌ Fehler beim Laden<br>
+                    <small>Versuche es später erneut</small>
+                </div>
+            `;
+        }
+
+        // Send chat command (if user is logged in)
+        function sendChatCommand(command) {
+            if (currentUser) {
+                // In a real extension, you'd use Twitch's chat API
+                // For now, we'll just show the command
+                twitch.rig.log(`Sending command: ${command}`);
+                
+                // Show feedback
+                const gameItem = event.target.closest('.game-item');
+                const originalBg = gameItem.style.background;
+                gameItem.style.background = 'rgba(255, 215, 0, 0.3)';
+                setTimeout(() => {
+                    gameItem.style.background = originalBg;
+                }, 1000);
+            } else {
+                twitch.rig.log('User not logged in');
+            }
+        }
+
+        // Initial load
+        loadLeaderboard();
+
+        // Auto-refresh every 30 seconds
+        refreshInterval = setInterval(() => {
+            loadLeaderboard();
+            if (currentUser) {
+                loadUserStats(currentUser.userId);
+            }
+        }, 30000);
+
+        // Handle visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                loadLeaderboard();
+                if (currentUser) {
+                    loadUserStats(currentUser.userId);
+                }
+            }
+        });
+
+        // Cleanup on unload
+        window.addEventListener('beforeunload', () => {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+    </script>
+</body>
+</html>

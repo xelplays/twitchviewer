@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboard Extension Config</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #9146ff 0%, #6441a5 100%);
+            color: white;
+            height: 700px;
+            overflow: hidden;
+        }
+
+        .container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+
+        .content {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+
+        .config-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .config-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #ffd700;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 14px;
+            backdrop-filter: blur(5px);
+        }
+
+        .form-group input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+
+        .info-box {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ffd700;
+        }
+
+        .info-box h3 {
+            color: #ffd700;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .info-box p {
+            font-size: 13px;
+            opacity: 0.9;
+            line-height: 1.4;
+        }
+
+        .save-button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .save-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .preview-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .preview-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #ffd700;
+            text-align: center;
+        }
+
+        .preview-iframe {
+            width: 100%;
+            height: 400px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-online {
+            background: #4caf50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
+        .status-offline {
+            background: #f44336;
+            box-shadow: 0 0 10px rgba(244, 67, 54, 0.5);
+        }
+
+        .commands-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .commands-list li {
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .commands-list li::before {
+            content: "💬";
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 Leaderboard & Games Extension</h1>
+            <p>Konfiguriere deine interaktive Viewer-Experience</p>
+        </div>
+
+        <div class="content">
+            <div class="config-section">
+                <div class="config-title">⚙️ Konfiguration</div>
+                
+                <div class="form-group">
+                    <label for="pointsPerMessage">Punkte pro Chat-Nachricht</label>
+                    <input type="number" id="pointsPerMessage" value="1" min="0" max="10">
+                </div>
+
+                <div class="form-group">
+                    <label for="pointsPerMinute">Viewtime Punkte pro Minute</label>
+                    <input type="number" id="pointsPerMinute" value="1" min="0" max="10">
+                </div>
+
+                <div class="form-group">
+                    <label for="maxPointsPerHour">Max. Chat-Punkte pro Stunde</label>
+                    <input type="number" id="maxPointsPerHour" value="30" min="10" max="100">
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="enableDiceGame" checked>
+                    <label for="enableDiceGame">🎲 Dice Game aktiviert</label>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="enableLottery" checked>
+                    <label for="enableLottery">🎟️ Lottery aktiviert</label>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="enableRPSGame" checked>
+                    <label for="enableRPSGame">✂️ Rock-Paper-Scissors aktiviert</label>
+                </div>
+
+                <div class="form-group">
+                    <label for="lotteryCost">Lotterie Eintritt (Punkte)</label>
+                    <input type="number" id="lotteryCost" value="10" min="5" max="50">
+                </div>
+
+                <div class="info-box">
+                    <h3>ℹ️ Info</h3>
+                    <p>Diese Einstellungen werden in der Live-Config angewendet. Änderungen werden sofort für alle Viewer sichtbar.</p>
+                </div>
+
+                <button class="save-button" onclick="saveConfig()">
+                    💾 Konfiguration speichern
+                </button>
+            </div>
+
+            <div class="preview-section">
+                <div class="preview-title">👁️ Live Preview</div>
+                
+                <div class="info-box">
+                    <h3>📊 Status</h3>
+                    <p>
+                        <span class="status-indicator status-online"></span>
+                        Extension ist aktiv und läuft
+                    </p>
+                </div>
+
+                <div class="info-box">
+                    <h3>🎮 Verfügbare Commands</h3>
+                    <ul class="commands-list">
+                        <li>!dice - Würfelspiel (2-12 Punkte)</li>
+                        <li>!lottery - Tägliche Lotterie</li>
+                        <li>!rps rock/paper/scissors</li>
+                        <li>!points - Deine Punkte anzeigen</li>
+                        <li>!leaderboard - Top 5 im Chat</li>
+                    </ul>
+                </div>
+
+                <iframe src="panel.html" class="preview-iframe" title="Extension Preview"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+    <script>
+        const twitch = window.Twitch.ext;
+
+        // Load saved configuration
+        function loadConfig() {
+            const config = twitch.configuration.broadcaster;
+            if (config && config.content) {
+                try {
+                    const settings = JSON.parse(config.content);
+                    
+                    document.getElementById('pointsPerMessage').value = settings.pointsPerMessage || 1;
+                    document.getElementById('pointsPerMinute').value = settings.pointsPerMinute || 1;
+                    document.getElementById('maxPointsPerHour').value = settings.maxPointsPerHour || 30;
+                    document.getElementById('enableDiceGame').checked = settings.enableDiceGame !== false;
+                    document.getElementById('enableLottery').checked = settings.enableLottery !== false;
+                    document.getElementById('enableRPSGame').checked = settings.enableRPSGame !== false;
+                    document.getElementById('lotteryCost').value = settings.lotteryCost || 10;
+                } catch (error) {
+                    console.error('Error loading config:', error);
+                }
+            }
+        }
+
+        // Save configuration
+        function saveConfig() {
+            const config = {
+                pointsPerMessage: parseInt(document.getElementById('pointsPerMessage').value),
+                pointsPerMinute: parseInt(document.getElementById('pointsPerMinute').value),
+                maxPointsPerHour: parseInt(document.getElementById('maxPointsPerHour').value),
+                enableDiceGame: document.getElementById('enableDiceGame').checked,
+                enableLottery: document.getElementById('enableLottery').checked,
+                enableRPSGame: document.getElementById('enableRPSGame').checked,
+                lotteryCost: parseInt(document.getElementById('lotteryCost').value)
+            };
+
+            twitch.configuration.set('broadcaster', '', JSON.stringify(config));
+            
+            // Show feedback
+            const button = document.querySelector('.save-button');
+            const originalText = button.textContent;
+            button.textContent = '✅ Gespeichert!';
+            button.style.background = 'linear-gradient(45deg, #4caf50, #8bc34a)';
+            
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.style.background = 'linear-gradient(45deg, #ff6b6b, #feca57)';
+            }, 2000);
+        }
+
+        // Initialize when ready
+        twitch.onReady(() => {
+            console.log('Twitch Extension Config Ready');
+            loadConfig();
+        });
+
+        // Listen for configuration changes
+        twitch.configuration.onChanged(() => {
+            loadConfig();
+        });
+    </script>
+</body>
+</html>

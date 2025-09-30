@@ -93,12 +93,20 @@ console.log('- Bot Client ID:', config.twitchBotClientId);
 
 // Express app setup
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://www.twitch.tv',
+    'https://dashboard.twitch.tv',
+    'https://extension-files.twitch.tv'
+  ],
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'overlay_static')));
 app.use('/admin', express.static(path.join(__dirname, 'admin_static')));
 app.use('/dashboard', express.static(path.join(__dirname, 'dashboard_static')));
 app.use('/twitch_panel', express.static(path.join(__dirname, 'twitch_panel')));
+app.use('/twitch_extension', express.static(path.join(__dirname, 'twitch_extension')));
 
 // Session configuration
 app.use(session({

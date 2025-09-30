@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "name": "Leaderboard & Games",
+  "version": "1.0.0",
+  "author_name": "einfachsven",
+  "author_email": "contact@einfachsven.xyz",
+  "description": "Live Leaderboard with interactive games and point system for viewers",
+  "icon": "assets/icon.png",
+  "category": "other",
+  "summary": "Interactive leaderboard with games like dice, lottery, and rock-paper-scissors",
+  "panel_height": 500,
+  "viewer_summary": "Check your points, play games, and compete on the leaderboard!",
+  "config_path": "config.html",
+  "live_config_path": "live_config.html",
+  "viewer_path": "panel.html",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "permissions": [
+    "identity"
+  ]
+}
