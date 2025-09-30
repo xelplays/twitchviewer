@@ -31,6 +31,7 @@ const config = {
   // Optional Twitch API
   twitchClientId: process.env.TWITCH_CLIENT_ID,
   twitchClientSecret: process.env.TWITCH_CLIENT_SECRET,
+  twitchBotClientId: process.env.TWITCH_BOT_CLIENT_ID || process.env.TWITCH_CLIENT_ID,
   enableEventSub: process.env.ENABLE_EVENTSUB === 'true',
   
   // OAuth Configuration
@@ -87,7 +88,8 @@ console.log('- Username:', config.botUsername);
 console.log('- Token (first 10 chars):', config.botOauth.substring(6, 16));
 console.log('- Channel:', config.channel);
 console.log('- Token length:', config.botOauth.substring(6).length);
-console.log('- Client ID:', config.twitchClientId);
+console.log('- Dashboard Client ID:', config.twitchClientId);
+console.log('- Bot Client ID:', config.twitchBotClientId);
 
 // Express app setup
 const app = express();
@@ -1033,10 +1035,33 @@ async function getChatActiveUsers() {
 // Get current viewers from Twitch API
 async function getCurrentViewers() {
   try {
-    // For now, use chat activity only since we have Client ID / OAuth mismatch
-    // TODO: Fix OAuth token to match Client ID for proper viewer tracking
-    console.log('Using chat-only tracking (OAuth/Client ID mismatch)');
-    return [];
+    // Use Twitch Helix API to get current viewers with Bot Client ID
+    const response = await axios.get(`https://api.twitch.tv/helix/streams?user_login=${config.channel}`, {
+      headers: {
+        'Client-ID': config.twitchBotClientId,
+        'Authorization': `Bearer ${config.botOauth.substring(6)}`
+      }
+    });
+    
+    if (response.data.data.length === 0) {
+      console.log('Stream is offline, no viewers to track');
+      return [];
+    }
+    
+    const streamId = response.data.data[0].id;
+    
+    // Get chatters (viewers)
+    const chattersResponse = await axios.get(`https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${streamId}&moderator_id=${streamId}`, {
+      headers: {
+        'Client-ID': config.twitchBotClientId,
+        'Authorization': `Bearer ${config.botOauth.substring(6)}`
+      }
+    });
+    
+    const viewers = chattersResponse.data.data.map(chatter => chatter.user_login);
+    console.log(`Found ${viewers.length} current viewers using Bot Client ID`);
+    
+    return viewers;
   } catch (error) {
     console.error('Error fetching current viewers:', error);
     // Fallback: use chat activity only
