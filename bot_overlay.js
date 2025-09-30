@@ -348,7 +348,7 @@ app.post('/api/clips/:id/reject', authenticateAdmin, async (req, res) => {
 app.get('/auth/twitch', (req, res) => {
   const authUrl = `https://id.twitch.tv/oauth2/authorize?` +
     `client_id=${config.twitchClientId}&` +
-    `redirect_uri=${encodeURIComponent(`http://${req.get('host')}/auth/twitch/callback`)}&` +
+    `redirect_uri=${encodeURIComponent('https://einfachsven.xyz/auth/twitch/callback')}&` +
     `response_type=code&` +
     `scope=user:read:email`;
   
@@ -369,7 +369,7 @@ app.get('/auth/twitch/callback', async (req, res) => {
       client_secret: config.twitchClientSecret,
       code: code,
       grant_type: 'authorization_code',
-      redirect_uri: `http://${req.get('host')}/auth/twitch/callback`
+      redirect_uri: 'https://einfachsven.xyz/auth/twitch/callback'
     });
     
     const { access_token } = tokenResponse.data;
