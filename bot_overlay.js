@@ -53,10 +53,16 @@ initDb();
 
 // Twitch Bot Configuration
 const client = new tmi.Client({
-  options: { debug: process.env.NODE_ENV === 'development' },
+  options: { 
+    debug: false,
+    messagesLogLevel: 'warn'
+  },
   connection: {
     reconnect: true,
-    secure: true
+    secure: true,
+    server: 'irc.chat.twitch.tv',
+    port: 443,
+    timeout: 30000
   },
   identity: {
     username: config.botUsername,
@@ -333,27 +339,31 @@ async function handleChatMessage(channel, userstate, message, self) {
     display_name: displayName
   });
   
-  // Award chat points (with anti-spam measures)
-  const timeSinceLastMessage = now - (user.last_message_ts || 0);
-  const timeSinceHourReset = now - (user.chat_points_hour_reset_ts || 0);
+  // Award chat points (with anti-spam measures) - disabled for testing
+  const enableChatPoints = false; // Set to true to enable chat points
   
-  if (timeSinceLastMessage >= config.minSecondsBetweenChatPoints) {
-    let chatPointsThisHour = user.chat_points_last_hour || 0;
+  if (enableChatPoints) {
+    const timeSinceLastMessage = now - (user.last_message_ts || 0);
+    const timeSinceHourReset = now - (user.chat_points_hour_reset_ts || 0);
     
-    // Reset hourly counter if needed
-    if (timeSinceHourReset >= 3600) {
-      chatPointsThisHour = 0;
-    }
-    
-    if (chatPointsThisHour < config.maxChatPointsPerHour) {
-      chatPointsThisHour += config.pointsPerMessage;
-      const newTotal = await addPointsToUser(username, config.pointsPerMessage, 'chat-message');
+    if (timeSinceLastMessage >= config.minSecondsBetweenChatPoints) {
+      let chatPointsThisHour = user.chat_points_last_hour || 0;
       
-      await updateUser(username, {
-        last_message_ts: now,
-        chat_points_last_hour: chatPointsThisHour,
-        chat_points_hour_reset_ts: timeSinceHourReset >= 3600 ? now : user.chat_points_hour_reset_ts
-      });
+      // Reset hourly counter if needed
+      if (timeSinceHourReset >= 3600) {
+        chatPointsThisHour = 0;
+      }
+      
+      if (chatPointsThisHour < config.maxChatPointsPerHour) {
+        chatPointsThisHour += config.pointsPerMessage;
+        const newTotal = await addPointsToUser(username, config.pointsPerMessage, 'chat-message');
+        
+        await updateUser(username, {
+          last_message_ts: now,
+          chat_points_last_hour: chatPointsThisHour,
+          chat_points_hour_reset_ts: timeSinceHourReset >= 3600 ? now : user.chat_points_hour_reset_ts
+        });
+      }
     }
   }
   
@@ -409,15 +419,26 @@ async function handleChatMessage(channel, userstate, message, self) {
             return;
           }
           
-          // Check for duplicate URL
-          db.get('SELECT id FROM clips WHERE clip_url = ?', [clipUrl], (err, existing) => {
+          // Check for duplicate URL and validate ownership
+          db.get('SELECT id, submitter FROM clips WHERE clip_url = ?', [clipUrl], (err, existing) => {
             if (err) {
               console.error('Error checking duplicate clip:', err);
               return;
             }
             
             if (existing) {
-              client.say(channel, `@${username} Dieser Clip wurde bereits eingereicht!`);
+              // Check if the same user is submitting the same clip
+              if (existing.submitter === username.toLowerCase()) {
+                client.say(channel, `@${username} Du hast diesen Clip bereits eingereicht!`);
+              } else {
+                client.say(channel, `@${username} Dieser Clip wurde bereits von jemand anderem eingereicht!`);
+              }
+              return;
+            }
+            
+            // Validate that the user is the creator of the clip (basic check)
+            if (!validateClipOwnership(clipUrl, username)) {
+              client.say(channel, `@${username} Du kannst nur deine eigenen Clips einreichen!`);
               return;
             }
             
@@ -656,8 +677,38 @@ function extractClipId(url) {
   return match ? (match[1] || match[2]) : null;
 }
 
-// Viewtime tracking
+// Basic clip ownership validation (for testing - in production use Twitch API)
+function validateClipOwnership(clipUrl, username) {
+  // For now, we'll do a basic check based on URL pattern
+  // In production, you should use Twitch API to verify clip ownership
+  
+  // Extract channel from clip URL
+  const channelMatch = clipUrl.match(/twitch\.tv\/([^\/\s]+)/);
+  if (channelMatch) {
+    const channelFromUrl = channelMatch[1].toLowerCase();
+    const usernameLower = username.toLowerCase();
+    
+    // If the channel in URL matches the submitter, it's likely their clip
+    // This is a basic check - for production use Twitch API
+    if (channelFromUrl === usernameLower) {
+      return true;
+    }
+  }
+  
+  // For testing purposes, allow all clips (return true)
+  // In production, set this to false and use Twitch API validation
+  console.log(`[DEBUG] Clip ownership validation for ${username}: ${clipUrl}`);
+  return true; // Allow all for testing
+}
+
+// Viewtime tracking - disabled for testing
 async function updateViewtime() {
+  const enableViewtimePoints = false; // Set to true to enable viewtime points
+  
+  if (!enableViewtimePoints) {
+    return; // Skip viewtime tracking for testing
+  }
+  
   try {
     const timeout = getCurrentTimestamp() - config.presenceTimeoutSeconds;
     
