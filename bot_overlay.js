@@ -600,7 +600,7 @@ async function handleChatMessage({ channel, user, message, msg }) {
   });
   
   // Award chat points (with anti-spam measures) - disabled for testing
-  const enableChatPoints = false; // Set to true to enable chat points
+  const enableChatPoints = true; // Set to true to enable chat points
   
   if (enableChatPoints) {
     const timeSinceLastMessage = now - (user.last_message_ts || 0);
@@ -963,7 +963,7 @@ function validateClipOwnership(clipUrl, username) {
 
 // Enhanced viewtime tracking - checks both chat activity and viewer list
 async function updateViewtime() {
-  const enableViewtimePoints = false; // Set to true to enable viewtime points
+  const enableViewtimePoints = true; // Set to true to enable viewtime points
   
   if (!enableViewtimePoints) {
     return; // Skip viewtime tracking for testing
