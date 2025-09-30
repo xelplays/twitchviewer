@@ -35,4 +35,39 @@ CREATE TABLE IF NOT EXISTS clips (
   reviewed_at INTEGER,
   note TEXT
 );
+
+CREATE TABLE IF NOT EXISTS achievements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL,        -- username (lowercase)
+  achievement_type TEXT NOT NULL,
+  achievement_name TEXT NOT NULL,
+  description TEXT,
+  points_rewarded INTEGER DEFAULT 0,
+  earned_at INTEGER DEFAULT 0,
+  UNIQUE(username, achievement_type)
+);
+
+CREATE TABLE IF NOT EXISTS lottery (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL,        -- username (lowercase)
+  tickets INTEGER NOT NULL DEFAULT 1,
+  entry_date TEXT DEFAULT CURRENT_DATE,
+  UNIQUE(username, entry_date)
+);
+
+CREATE TABLE IF NOT EXISTS lottery_draws (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  draw_date TEXT DEFAULT CURRENT_DATE,
+  winner_username TEXT,
+  total_tickets INTEGER,
+  prize_pool INTEGER,
+  drawn_at INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  setting_key TEXT NOT NULL UNIQUE,
+  setting_value TEXT NOT NULL,
+  updated_at INTEGER DEFAULT 0
+);
 COMMIT;

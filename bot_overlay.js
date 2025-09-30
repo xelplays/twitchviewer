@@ -177,22 +177,37 @@ function addPointsToUser(username, points, reason = 'manual') {
         return reject(new Error('User not found'));
       }
       
-      const oldPoints = user.points;
-      const newPoints = oldPoints + points;
-      
-      // Log suspicious activity for large point increases
-      if (points > 50) {
-        logSuspiciousActivity(`Large point increase for ${username}`, {
-          points: points,
-          reason: reason,
-          oldTotal: oldPoints,
-          newTotal: newPoints
-        });
-      }
-      
-      updateUser(username, { points: newPoints }).then(() => {
-        resolve(newPoints);
-      }).catch(reject);
+      // Check for double points setting
+      db.get('SELECT setting_value FROM settings WHERE setting_key = ?', ['double_points_enabled'], (err, row) => {
+        if (err) {
+          console.error('Error checking double points setting:', err);
+        }
+        
+        let finalPoints = points;
+        if (row && row.setting_value === 'true' && points > 0) {
+          finalPoints = points * 2;
+          console.log(`Double points active: ${points} → ${finalPoints} for ${username}`);
+        }
+        
+        const oldPoints = user.points;
+        const newPoints = oldPoints + finalPoints;
+        
+        // Log suspicious activity for large point increases
+        if (finalPoints > 50) {
+          logSuspiciousActivity(`Large point increase for ${username}`, {
+            points: finalPoints,
+            originalPoints: points,
+            reason: reason,
+            oldTotal: oldPoints,
+            newTotal: newPoints,
+            doublePointsActive: row && row.setting_value === 'true'
+          });
+        }
+        
+        updateUser(username, { points: newPoints }).then(() => {
+          resolve(newPoints);
+        }).catch(reject);
+      });
     }).catch(reject);
   });
 }
@@ -653,6 +668,79 @@ async function handleChatMessage({ channel, user, message, msg }) {
       }
       break;
       
+    case '!dice':
+      const roll = Math.floor(Math.random() * 6) + 1;
+      const points = roll * 2; // 2-12 Punkte je nach Würfel
+      await addPointsToUser(username, points, 'dice_game');
+      sendChatMessage(`🎲 @${username} würfelt eine ${roll}! +${points} Punkte!`);
+      break;
+      
+    case '!lottery':
+      const cost = 10; // 10 Punkte pro Ticket
+      const user = await getUser(username);
+      if (!user || user.points < cost) {
+        sendChatMessage(`@${username} Du brauchst mindestens ${cost} Punkte für die Lotterie!`);
+        break;
+      }
+      
+      // Check if already entered today
+      db.get('SELECT * FROM lottery WHERE username = ? AND entry_date = DATE("now")', [username], async (err, existing) => {
+        if (err) {
+          console.error('Error checking lottery entry:', err);
+          return;
+        }
+        
+        if (existing) {
+          sendChatMessage(`@${username} Du bist bereits für heute in der Lotterie!`);
+          return;
+        }
+        
+        // Deduct points and enter lottery
+        await addPointsToUser(username, -cost, 'lottery_entry');
+        db.run('INSERT INTO lottery (username, tickets) VALUES (?, ?)', [username, 1], (err) => {
+          if (err) {
+            console.error('Error entering lottery:', err);
+            return;
+          }
+          sendChatMessage(`🎟️ @${username} ist in der Lotterie! (-${cost} Punkte) Viel Glück!`);
+        });
+      });
+      break;
+      
+    case '!rps':
+      if (args.length < 2) {
+        sendChatMessage(`@${username} Nutze: !rps rock/paper/scissors`);
+        break;
+      }
+      
+      const choices = ['rock', 'paper', 'scissors'];
+      const botChoice = choices[Math.floor(Math.random() * 3)];
+      const userChoice = args[1].toLowerCase();
+      
+      if (!choices.includes(userChoice)) {
+        sendChatMessage(`@${username} Nutze: !rps rock/paper/scissors`);
+        break;
+      }
+      
+      let result = 'draw';
+      let points = 0;
+      
+      if (botChoice === 'rock' && userChoice === 'paper') result = 'win';
+      else if (botChoice === 'paper' && userChoice === 'scissors') result = 'win';
+      else if (botChoice === 'scissors' && userChoice === 'rock') result = 'win';
+      else if (botChoice !== userChoice) result = 'lose';
+      
+      if (result === 'win') points = 20;
+      else if (result === 'lose') points = -5;
+      
+      if (points !== 0) {
+        await addPointsToUser(username, points, 'rps_game');
+      }
+      
+      const emojis = { rock: '🪨', paper: '📄', scissors: '✂️' };
+      sendChatMessage(`${emojis[botChoice]} vs ${emojis[userChoice]} | @${username} ${result === 'win' ? 'gewinnst' : result === 'lose' ? 'verlierst' : 'unentschieden'}! ${points > 0 ? '+' : ''}${points} Punkte`);
+      break;
+      
     case '!submitclip':
       if (args.length < 2) {
         sendChatMessage( `@${username} Usage: !submitclip <clip_url>`);
@@ -924,6 +1012,92 @@ async function handleChatMessage({ channel, user, message, msg }) {
         console.error('Error dropping random points:', error);
         sendChatMessage( `@${username} Fehler beim Verteilen der Punkte!`);
       }
+      break;
+      
+    case '!doublepoints':
+      if (!isAdmin) {
+        sendChatMessage( `@${username} Nur Admins können das!`);
+        break;
+      }
+      
+      // Toggle double points
+      db.get('SELECT setting_value FROM settings WHERE setting_key = ?', ['double_points_enabled'], (err, row) => {
+        if (err) {
+          console.error('Error checking double points setting:', err);
+          return;
+        }
+        
+        const isEnabled = row ? row.setting_value === 'true' : false;
+        const newValue = !isEnabled;
+        
+        db.run('INSERT OR REPLACE INTO settings (setting_key, setting_value, updated_at) VALUES (?, ?, ?)', 
+          ['double_points_enabled', newValue.toString(), getCurrentTimestamp()], (err) => {
+          if (err) {
+            console.error('Error updating double points setting:', err);
+            return;
+          }
+          
+          if (newValue) {
+            sendChatMessage(`🎉 Doppelte Punkte sind EINGESCHALTET! Alle Punkte werden verdoppelt!`);
+          } else {
+            sendChatMessage(`❌ Doppelte Punkte sind AUSGESCHALTET.`);
+          }
+        });
+      });
+      break;
+      
+    case '!drawlottery':
+      if (!isAdmin) {
+        sendChatMessage( `@${username} Nur Admins können das!`);
+        break;
+      }
+      
+      // Draw lottery for today
+      db.all('SELECT username, tickets FROM lottery WHERE entry_date = DATE("now")', [], (err, entries) => {
+        if (err) {
+          console.error('Error fetching lottery entries:', err);
+          return;
+        }
+        
+        if (entries.length === 0) {
+          sendChatMessage(`🎟️ Keine Lotterie-Einträge für heute gefunden!`);
+          return;
+        }
+        
+        // Calculate total tickets and prize pool
+        let totalTickets = 0;
+        let prizePool = 0;
+        
+        entries.forEach(entry => {
+          totalTickets += entry.tickets;
+          prizePool += entry.tickets * 10; // 10 points per ticket as prize
+        });
+        
+        // Random selection weighted by tickets
+        let random = Math.random() * totalTickets;
+        let winner = null;
+        
+        for (const entry of entries) {
+          random -= entry.tickets;
+          if (random <= 0) {
+            winner = entry.username;
+            break;
+          }
+        }
+        
+        // Award prize
+        addPointsToUser(winner, prizePool, 'lottery_win');
+        
+        // Record draw
+        db.run('INSERT INTO lottery_draws (winner_username, total_tickets, prize_pool, drawn_at) VALUES (?, ?, ?, ?)',
+          [winner, totalTickets, prizePool, getCurrentTimestamp()], (err) => {
+          if (err) {
+            console.error('Error recording lottery draw:', err);
+          }
+        });
+        
+        sendChatMessage(`🎉 Lotterie-Gewinner: @${winner}! 🏆 ${prizePool} Punkte gewonnen! (${totalTickets} Tickets, ${entries.length} Teilnehmer)`);
+      });
       break;
   }
 }
