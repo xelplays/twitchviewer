@@ -1054,27 +1054,19 @@ function runMonthlyJob() {
   );
 }
 
-// Helper function to send messages (tries multiple methods)
+// Helper function to send messages using twitch-js API
 async function sendChatMessage(message) {
   console.log('🔍 sendChatMessage called with:', message);
   try {
-    console.log('🔍 Trying chat.say...');
-    await chat.say(message);
-    console.log('✅ chat.say called successfully');
+    // Use the correct twitch-js method for sending messages
+    console.log('🔍 Sending message to channel:', config.channel);
+    await chat.say(`#${config.channel}`, message);
+    console.log('✅ Message sent successfully');
     return true;
   } catch (error) {
-    console.log('❌ chat.say failed:', error.message);
+    console.log('❌ Failed to send message:', error.message);
     console.log('❌ Error details:', error);
-    try {
-      console.log('🔍 Trying chat.send...');
-      await chat.send(message);
-      console.log('✅ chat.send called successfully');
-      return true;
-    } catch (error2) {
-      console.log('❌ chat.send also failed:', error2.message);
-      console.log('❌ Error2 details:', error2);
-      return false;
-    }
+    return false;
   }
 }
 
