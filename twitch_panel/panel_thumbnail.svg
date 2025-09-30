@@ -1,0 +1,62 @@
+<svg width="320" height="180" viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9146ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6441a5;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffd700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ffed4e;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="320" height="180" fill="url(#bg)" rx="8"/>
+  
+  <!-- Header -->
+  <rect x="0" y="0" width="320" height="50" fill="rgba(0,0,0,0.3)" rx="8"/>
+  
+  <!-- Trophy Icon -->
+  <g transform="translate(20, 10)">
+    <text x="0" y="30" font-family="Arial, sans-serif" font-size="24" fill="url(#gold)">🏆</text>
+  </g>
+  
+  <!-- Title -->
+  <text x="60" y="35" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="white">Leaderboard</text>
+  
+  <!-- Subtitle -->
+  <text x="60" y="50" font-family="Arial, sans-serif" font-size="12" fill="rgba(255,255,255,0.8)">Live Punkte & Dashboard</text>
+  
+  <!-- Leaderboard Preview -->
+  <g transform="translate(20, 70)">
+    <!-- Rank 1 -->
+    <rect x="0" y="0" width="280" height="25" fill="rgba(255,215,0,0.3)" rx="4"/>
+    <text x="8" y="17" font-family="Arial, sans-serif" font-size="12" fill="#ffd700">🥇</text>
+    <text x="30" y="17" font-family="Arial, sans-serif" font-size="12" fill="white">TopUser1</text>
+    <text x="250" y="17" font-family="Arial, sans-serif" font-size="12" fill="#ffd700" text-anchor="end">1,234</text>
+    
+    <!-- Rank 2 -->
+    <rect x="0" y="30" width="280" height="25" fill="rgba(192,192,192,0.3)" rx="4"/>
+    <text x="8" y="47" font-family="Arial, sans-serif" font-size="12" fill="#c0c0c0">🥈</text>
+    <text x="30" y="47" font-family="Arial, sans-serif" font-size="12" fill="white">TopUser2</text>
+    <text x="250" y="47" font-family="Arial, sans-serif" font-size="12" fill="#c0c0c0" text-anchor="end">987</text>
+    
+    <!-- Rank 3 -->
+    <rect x="0" y="60" width="280" height="25" fill="rgba(205,127,50,0.3)" rx="4"/>
+    <text x="8" y="77" font-family="Arial, sans-serif" font-size="12" fill="#cd7f32">🥉</text>
+    <text x="30" y="77" font-family="Arial, sans-serif" font-size="12" fill="white">TopUser3</text>
+    <text x="250" y="77" font-family="Arial, sans-serif" font-size="12" fill="#cd7f32" text-anchor="end">654</text>
+  </g>
+  
+  <!-- Call to Action -->
+  <g transform="translate(20, 150)">
+    <rect x="0" y="0" width="120" height="25" fill="#ff6b6b" rx="12"/>
+    <text x="60" y="17" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white" text-anchor="middle">🚀 Dashboard</text>
+  </g>
+  
+  <!-- Games Info -->
+  <g transform="translate(160, 150)">
+    <rect x="0" y="0" width="140" height="25" fill="rgba(255,255,255,0.2)" rx="12"/>
+    <text x="70" y="17" font-family="Arial, sans-serif" font-size="10" fill="white" text-anchor="middle">🎮 !dice !lottery !rps</text>
+  </g>
+</svg>

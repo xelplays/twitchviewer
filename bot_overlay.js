@@ -98,6 +98,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'overlay_static')));
 app.use('/admin', express.static(path.join(__dirname, 'admin_static')));
 app.use('/dashboard', express.static(path.join(__dirname, 'dashboard_static')));
+app.use('/twitch_panel', express.static(path.join(__dirname, 'twitch_panel')));
 
 // Session configuration
 app.use(session({
