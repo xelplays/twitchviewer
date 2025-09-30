@@ -1067,10 +1067,22 @@ function sendChatMessage(message) {
 // Event handlers
 chat.on('PRIVMSG', handleChatMessage);
 
+// Try multiple event names for connection
 chat.on('connected', () => {
-  console.log(`Connected to Twitch IRC`);
+  console.log(`✅ Connected to Twitch IRC (connected event)`);
   sendChatMessage('Bot ist online! 🚀');
 });
+
+chat.on('CONNECTED', () => {
+  console.log(`✅ Connected to Twitch IRC (CONNECTED event)`);
+  sendChatMessage('Bot ist online! 🚀');
+});
+
+// Also try to send message after a delay
+setTimeout(() => {
+  console.log('🔍 Trying to send delayed message...');
+  sendChatMessage('Bot ist online! 🚀');
+}, 3000);
 
 // Start viewtime tracking
 setInterval(updateViewtime, config.heartbeatSeconds * 1000);
