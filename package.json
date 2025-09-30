@@ -14,8 +14,8 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@twurple/auth": "^5.4.7",
-    "@twurple/chat": "^5.4.7",
+    "@twurple/auth": "^6.0.0",
+    "@twurple/chat": "^6.0.0",
     "sqlite3": "^5.1.2",
     "express": "^4.18.2",
     "cors": "^2.8.5",
