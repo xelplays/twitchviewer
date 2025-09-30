@@ -6,6 +6,8 @@ const sqlite3 = require('sqlite3').verbose();
 const cron = require('node-cron');
 const path = require('path');
 const fs = require('fs');
+const session = require('express-session');
+const axios = require('axios');
 
 // Configuration from environment variables
 const config = {
@@ -28,7 +30,11 @@ const config = {
   // Optional Twitch API
   twitchClientId: process.env.TWITCH_CLIENT_ID,
   twitchClientSecret: process.env.TWITCH_CLIENT_SECRET,
-  enableEventSub: process.env.ENABLE_EVENTSUB === 'true'
+  enableEventSub: process.env.ENABLE_EVENTSUB === 'true',
+  
+  // OAuth Configuration
+  sessionSecret: process.env.SESSION_SECRET || 'your-session-secret-key',
+  adminUsers: process.env.ADMIN_USERS ? process.env.ADMIN_USERS.split(',') : ['einfachsven']
 };
 
 // Validate required configuration
@@ -77,6 +83,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'overlay_static')));
 app.use('/admin', express.static(path.join(__dirname, 'admin_static')));
+app.use('/dashboard', express.static(path.join(__dirname, 'dashboard_static')));
+
+// Session configuration
+app.use(session({
+  secret: config.sessionSecret,
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: false, // Set to true in production with HTTPS
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
 
 // Admin authentication middleware
 function authenticateAdmin(req, res, next) {
@@ -311,6 +329,238 @@ app.post('/api/clips/:id/reject', authenticateAdmin, async (req, res) => {
   } catch (error) {
     console.error('Error rejecting clip:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// OAuth Routes
+app.get('/auth/twitch', (req, res) => {
+  const authUrl = `https://id.twitch.tv/oauth2/authorize?` +
+    `client_id=${config.twitchClientId}&` +
+    `redirect_uri=${encodeURIComponent(`http://${req.get('host')}/auth/twitch/callback`)}&` +
+    `response_type=code&` +
+    `scope=user:read:email`;
+  
+  res.redirect(authUrl);
+});
+
+app.get('/auth/twitch/callback', async (req, res) => {
+  try {
+    const { code } = req.query;
+    
+    if (!code) {
+      return res.redirect('/dashboard?error=no_code');
+    }
+    
+    // Exchange code for access token
+    const tokenResponse = await axios.post('https://id.twitch.tv/oauth2/token', {
+      client_id: config.twitchClientId,
+      client_secret: config.twitchClientSecret,
+      code: code,
+      grant_type: 'authorization_code',
+      redirect_uri: `http://${req.get('host')}/auth/twitch/callback`
+    });
+    
+    const { access_token } = tokenResponse.data;
+    
+    // Get user info
+    const userResponse = await axios.get('https://api.twitch.tv/helix/users', {
+      headers: {
+        'Client-ID': config.twitchClientId,
+        'Authorization': `Bearer ${access_token}`
+      }
+    });
+    
+    const user = userResponse.data.data[0];
+    
+    // Store in session
+    req.session.user = {
+      id: user.id,
+      username: user.login,
+      displayName: user.display_name,
+      email: user.email,
+      isAdmin: config.adminUsers.includes(user.login.toLowerCase())
+    };
+    
+    res.redirect('/dashboard');
+    
+  } catch (error) {
+    console.error('OAuth callback error:', error);
+    res.redirect('/dashboard?error=auth_failed');
+  }
+});
+
+app.get('/auth/logout', (req, res) => {
+  req.session.destroy();
+  res.redirect('/dashboard');
+});
+
+// Dashboard API Endpoints
+app.get('/api/user/me', (req, res) => {
+  if (!req.session.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  
+  res.json(req.session.user);
+});
+
+app.get('/api/user/stats', async (req, res) => {
+  if (!req.session.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  
+  try {
+    const user = await getUser(req.session.user.username);
+    if (!user) {
+      return res.json({ points: 0, view_seconds: 0, message_count: 0 });
+    }
+    
+    res.json({
+      points: user.points,
+      view_seconds: user.view_seconds,
+      message_count: user.message_count,
+      last_seen: user.last_seen_ts
+    });
+  } catch (error) {
+    console.error('Error fetching user stats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/leaderboard', async (req, res) => {
+  try {
+    const topUsers = await getTopUsers(50);
+    const response = {
+      generated_at: Date.now(),
+      top: topUsers.map((user, index) => ({
+        rank: index + 1,
+        username: user.username,
+        display_name: user.display_name,
+        points: user.points
+      }))
+    };
+    res.json(response);
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/winners', (req, res) => {
+  try {
+    db.all(
+      'SELECT * FROM winners ORDER BY month DESC, rank ASC',
+      [],
+      (err, rows) => {
+        if (err) {
+          console.error('Error fetching winners:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+        res.json(rows);
+      }
+    );
+  } catch (error) {
+    console.error('Error fetching winners:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin Dashboard API Endpoints
+function requireAdmin(req, res, next) {
+  if (!req.session.user || !req.session.user.isAdmin) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
+  try {
+    db.all(
+      'SELECT username, display_name, points, view_seconds, message_count, last_seen_ts FROM points ORDER BY points DESC LIMIT 100',
+      [],
+      (err, rows) => {
+        if (err) {
+          console.error('Error fetching users:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+        res.json(rows);
+      }
+    );
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/admin/give-points', requireAdmin, async (req, res) => {
+  try {
+    const { username, points, reason = 'admin-give' } = req.body;
+    
+    if (!username || !points || points <= 0) {
+      return res.status(400).json({ error: 'Invalid parameters' });
+    }
+    
+    const newTotal = await addPointsToUser(username, points, reason);
+    
+    res.json({ 
+      ok: true, 
+      username, 
+      pointsAdded: points, 
+      newTotal 
+    });
+  } catch (error) {
+    console.error('Error giving points:', error);
+    res.status(500).json({ error: 'Failed to give points' });
+  }
+});
+
+app.post('/api/admin/end-month', requireAdmin, async (req, res) => {
+  try {
+    const { winners } = req.body;
+    
+    if (!winners || !Array.isArray(winners) || winners.length === 0) {
+      return res.status(400).json({ error: 'Invalid winners data' });
+    }
+    
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    // Save winners
+    const timestamp = getCurrentTimestamp();
+    for (let i = 0; i < winners.length; i++) {
+      const winner = winners[i];
+      
+      db.run(
+        'INSERT INTO winners (month, rank, username, display_name, points, awarded_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [currentMonth, i + 1, winner.username, winner.display_name, winner.points, timestamp],
+        function(err) {
+          if (err) {
+            console.error('Error saving winner:', err);
+          }
+        }
+      );
+    }
+    
+    // Announce in chat
+    const announcement = winners.map((winner, index) => 
+      `${index + 1}. ${winner.display_name || winner.username} (${winner.points} Punkte)`
+    ).join(' | ');
+    
+    client.say(config.channel, `🏆 Monats-Sieger ${currentMonth}: ${announcement}`);
+    
+    // Reset all points
+    db.run('UPDATE points SET points = 0, view_seconds = 0', (err) => {
+      if (err) {
+        console.error('Error resetting points:', err);
+      } else {
+        client.say(config.channel, '🎯 Alle Punkte wurden für den neuen Monat zurückgesetzt!');
+      }
+    });
+    
+    res.json({ ok: true, month: currentMonth, winners: winners.length });
+    
+  } catch (error) {
+    console.error('Error ending month:', error);
+    res.status(500).json({ error: 'Failed to end month' });
   }
 });
 

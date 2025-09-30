@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitch Activity Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Loading Screen -->
+        <div id="loading" class="loading-screen">
+            <div class="loading-content">
+                <i class="fas fa-spinner fa-spin"></i>
+                <h2>Twitch Activity Dashboard</h2>
+                <p>Lade Dashboard...</p>
+            </div>
+        </div>
+
+        <!-- Login Screen -->
+        <div id="login" class="screen" style="display: none;">
+            <div class="login-container">
+                <div class="login-header">
+                    <h1><i class="fas fa-trophy"></i> Twitch Activity</h1>
+                    <p>Melde dich mit deinem Twitch Account an, um deine Punkte und das Leaderboard zu sehen!</p>
+                </div>
+                
+                <a href="/auth/twitch" class="login-btn">
+                    <i class="fab fa-twitch"></i>
+                    Mit Twitch anmelden
+                </a>
+                
+                <div class="login-info">
+                    <p><i class="fas fa-info-circle"></i> Du musst dich mit deinem Twitch Account anmelden, um das Dashboard zu verwenden.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Screen -->
+        <div id="dashboard" class="screen" style="display: none;">
+            <!-- Header -->
+            <header class="dashboard-header">
+                <div class="header-content">
+                    <h1><i class="fas fa-trophy"></i> Twitch Activity Dashboard</h1>
+                    <div class="user-info">
+                        <div class="user-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="user-details">
+                            <span class="username" id="userDisplayName">Loading...</span>
+                            <span class="logout-btn" onclick="logout()">
+                                <i class="fas fa-sign-out-alt"></i> Abmelden
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Navigation -->
+            <nav class="dashboard-nav">
+                <button class="nav-btn active" data-tab="stats">
+                    <i class="fas fa-chart-line"></i> Meine Stats
+                </button>
+                <button class="nav-btn" data-tab="leaderboard">
+                    <i class="fas fa-trophy"></i> Leaderboard
+                </button>
+                <button class="nav-btn" data-tab="winners">
+                    <i class="fas fa-crown"></i> Monats-Sieger
+                </button>
+                <button class="nav-btn" data-tab="admin" id="adminTab" style="display: none;">
+                    <i class="fas fa-cog"></i> Admin
+                </button>
+            </nav>
+
+            <!-- Content -->
+            <main class="dashboard-content">
+                <!-- User Stats Tab -->
+                <div id="stats-tab" class="tab-content active">
+                    <div class="stats-container">
+                        <h2>Deine Statistiken</h2>
+                        
+                        <div class="stats-grid">
+                            <div class="stat-card primary">
+                                <div class="stat-icon">
+                                    <i class="fas fa-star"></i>
+                                </div>
+                                <div class="stat-content">
+                                    <h3 id="userPoints">0</h3>
+                                    <p>Punkte</p>
+                                </div>
+                            </div>
+                            
+                            <div class="stat-card">
+                                <div class="stat-icon">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                                <div class="stat-content">
+                                    <h3 id="userViewtime">0h</h3>
+                                    <p>Zuschauerzeit</p>
+                                </div>
+                            </div>
+                            
+                            <div class="stat-card">
+                                <div class="stat-icon">
+                                    <i class="fas fa-comments"></i>
+                                </div>
+                                <div class="stat-content">
+                                    <h3 id="userMessages">0</h3>
+                                    <p>Nachrichten</p>
+                                </div>
+                            </div>
+                            
+                            <div class="stat-card">
+                                <div class="stat-icon">
+                                    <i class="fas fa-eye"></i>
+                                </div>
+                                <div class="stat-content">
+                                    <h3 id="userRank">#-</h3>
+                                    <p>Rang</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="stats-info">
+                            <p><i class="fas fa-info-circle"></i> Deine Punkte werden durch Chat-Aktivität und Zuschauerzeit gesammelt.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Leaderboard Tab -->
+                <div id="leaderboard-tab" class="tab-content">
+                    <div class="leaderboard-container">
+                        <h2>🏆 Leaderboard</h2>
+                        
+                        <div class="leaderboard-header">
+                            <span class="last-updated" id="leaderboardUpdated">Loading...</span>
+                            <button class="refresh-btn" onclick="loadLeaderboard()">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="leaderboard-list" id="leaderboardList">
+                            <div class="loading">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Winners Tab -->
+                <div id="winners-tab" class="tab-content">
+                    <div class="winners-container">
+                        <h2>👑 Monats-Sieger</h2>
+                        
+                        <div class="winners-list" id="winnersList">
+                            <div class="loading">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Tab -->
+                <div id="admin-tab" class="tab-content">
+                    <div class="admin-container">
+                        <h2>⚙️ Admin Dashboard</h2>
+                        
+                        <div class="admin-sections">
+                            <!-- Give Points Section -->
+                            <div class="admin-section">
+                                <h3><i class="fas fa-gift"></i> Punkte vergeben</h3>
+                                <div class="admin-form">
+                                    <div class="form-group">
+                                        <label for="giveUsername">Username:</label>
+                                        <input type="text" id="giveUsername" placeholder="Username">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="givePoints">Punkte:</label>
+                                        <input type="number" id="givePoints" placeholder="Anzahl" min="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="giveReason">Grund (optional):</label>
+                                        <input type="text" id="giveReason" placeholder="z.B. Special Event">
+                                    </div>
+                                    <button class="btn btn-primary" onclick="givePoints()">
+                                        <i class="fas fa-gift"></i> Punkte vergeben
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Month End Section -->
+                            <div class="admin-section">
+                                <h3><i class="fas fa-calendar-times"></i> Monat beenden</h3>
+                                <div class="month-end-info">
+                                    <p>Wähle die Top 3 User für diesen Monat aus und beende den Monat.</p>
+                                    <button class="btn btn-warning" onclick="loadUsersForMonthEnd()">
+                                        <i class="fas fa-users"></i> Top User laden
+                                    </button>
+                                </div>
+                                
+                                <div id="monthEndContainer" style="display: none;">
+                                    <h4>Top User für Monats-Ende:</h4>
+                                    <div id="topUsersList"></div>
+                                    <button class="btn btn-danger" onclick="endMonth()">
+                                        <i class="fas fa-calendar-times"></i> Monat beenden
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- User Management Section -->
+                            <div class="admin-section">
+                                <h3><i class="fas fa-users"></i> User Management</h3>
+                                <button class="btn btn-secondary" onclick="loadAllUsers()">
+                                    <i class="fas fa-list"></i> Alle User anzeigen
+                                </button>
+                                <div id="allUsersList" style="display: none;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast" class="toast">
+        <div class="toast-content">
+            <i class="toast-icon"></i>
+            <span class="toast-message"></span>
+        </div>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>
