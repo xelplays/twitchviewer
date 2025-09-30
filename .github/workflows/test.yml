@@ -1,0 +1,63 @@
+name: Test Twitch Activity Bot
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run setup test
+      run: npm test
+      
+    - name: Check file structure
+      run: |
+        echo "Checking required files exist..."
+        test -f package.json
+        test -f bot_overlay.js
+        test -f README.md
+        test -f env.example
+        test -f migrations/init.sql
+        test -f migrations/init_db.js
+        test -f overlay_static/overlay.html
+        test -f overlay_static/overlay.css
+        test -f overlay_static/overlay.js
+        test -f admin_static/clips.html
+        test -f admin_static/clips.css
+        test -f admin_static/clips.js
+        test -f modules/twitch-api.js
+        echo "✅ All required files present"
+        
+    - name: Lint check
+      run: |
+        echo "Checking for common issues..."
+        # Check for hardcoded secrets
+        if grep -r "oauth:" --include="*.js" --include="*.json" .; then
+          echo "❌ Found potential hardcoded OAuth tokens"
+          exit 1
+        fi
+        # Check for missing .env references
+        if grep -r "process.env" bot_overlay.js > /dev/null; then
+          echo "✅ Environment variables properly referenced"
+        fi
+        echo "✅ Lint check passed"

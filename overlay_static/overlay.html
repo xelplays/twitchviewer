@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitch Activity Leaderboard</title>
+    <link rel="stylesheet" href="overlay.css">
+</head>
+<body>
+    <div class="leaderboard-container">
+        <div class="header">
+            <h2>🏆 Activity Leaderboard</h2>
+            <div class="last-updated" id="lastUpdated"></div>
+        </div>
+        
+        <div class="leaderboard" id="leaderboard">
+            <div class="loading">Loading...</div>
+        </div>
+        
+        <div class="footer">
+            <div class="refresh-indicator" id="refreshIndicator"></div>
+        </div>
+    </div>
+    
+    <script src="overlay.js"></script>
+</body>
+</html>

@@ -1,0 +1,784 @@
+require('dotenv').config();
+const tmi = require('tmi.js');
+const express = require('express');
+const cors = require('cors');
+const sqlite3 = require('sqlite3').verbose();
+const cron = require('node-cron');
+const path = require('path');
+const fs = require('fs');
+
+// Configuration from environment variables
+const config = {
+  botUsername: process.env.BOT_USERNAME,
+  botOauth: process.env.BOT_OAUTH,
+  channel: process.env.CHANNEL,
+  adminKey: process.env.ADMIN_KEY,
+  expressPort: parseInt(process.env.EXPRESS_PORT) || 3000,
+  timezone: process.env.TIMEZONE || 'Europe/Berlin',
+  
+  // Bot behavior configuration
+  heartbeatSeconds: parseInt(process.env.HEARTBEAT_SECONDS) || 60,
+  presenceTimeoutSeconds: parseInt(process.env.PRESENCE_TIMEOUT_SECONDS) || 120,
+  viewtimeSecondsPerPoint: parseInt(process.env.VIEWTIME_SECONDS_PER_POINT) || 60,
+  pointsPerMessage: parseInt(process.env.POINTS_PER_MESSAGE) || 1,
+  minSecondsBetweenChatPoints: parseInt(process.env.MIN_SECONDS_BETWEEN_CHAT_POINTS) || 30,
+  maxChatPointsPerHour: parseInt(process.env.MAX_CHAT_POINTS_PER_HOUR) || 10,
+  maxClipsPerDay: parseInt(process.env.MAX_CLIPS_PER_DAY) || 3,
+  
+  // Optional Twitch API
+  twitchClientId: process.env.TWITCH_CLIENT_ID,
+  twitchClientSecret: process.env.TWITCH_CLIENT_SECRET,
+  enableEventSub: process.env.ENABLE_EVENTSUB === 'true'
+};
+
+// Validate required configuration
+if (!config.botUsername || !config.botOauth || !config.channel || !config.adminKey) {
+  console.error('Missing required environment variables. Please check your .env file.');
+  process.exit(1);
+}
+
+// Initialize database
+const dbPath = path.join(__dirname, 'activity.db');
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Error opening database:', err.message);
+    process.exit(1);
+  }
+  console.log('Connected to SQLite database.');
+});
+
+// Initialize database if it doesn't exist
+const initDb = require('./migrations/init_db');
+initDb();
+
+// Twitch Bot Configuration
+const client = new tmi.Client({
+  options: { debug: process.env.NODE_ENV === 'development' },
+  connection: {
+    reconnect: true,
+    secure: true
+  },
+  identity: {
+    username: config.botUsername,
+    password: config.botOauth
+  },
+  channels: [config.channel]
+});
+
+// Express app setup
+const app = express();
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'overlay_static')));
+app.use('/admin', express.static(path.join(__dirname, 'admin_static')));
+
+// Admin authentication middleware
+function authenticateAdmin(req, res, next) {
+  const adminKey = req.headers['x-admin-key'] || req.query.admin_key;
+  if (adminKey !== config.adminKey) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+// Utility functions
+function getCurrentTimestamp() {
+  return Math.floor(Date.now() / 1000);
+}
+
+function logSuspiciousActivity(message, details = {}) {
+  console.warn(`[SUSPICIOUS] ${message}`, details);
+  // In production, you might want to log to a file or monitoring service
+}
+
+// Database utility functions
+function getUser(username) {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM points WHERE username = ?', [username.toLowerCase()], (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+}
+
+function createUser(username, displayName) {
+  return new Promise((resolve, reject) => {
+    const now = getCurrentTimestamp();
+    db.run(
+      'INSERT INTO points (username, display_name, last_seen_ts) VALUES (?, ?, ?)',
+      [username.toLowerCase(), displayName, now],
+      function(err) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      }
+    );
+  });
+}
+
+function updateUser(username, updates) {
+  return new Promise((resolve, reject) => {
+    const setClause = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const values = Object.values(updates);
+    values.push(username.toLowerCase());
+    
+    db.run(
+      `UPDATE points SET ${setClause} WHERE username = ?`,
+      values,
+      function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      }
+    );
+  });
+}
+
+function addPointsToUser(username, points, reason = 'manual') {
+  return new Promise((resolve, reject) => {
+    getUser(username).then(user => {
+      if (!user) {
+        return reject(new Error('User not found'));
+      }
+      
+      const oldPoints = user.points;
+      const newPoints = oldPoints + points;
+      
+      // Log suspicious activity for large point increases
+      if (points > 50) {
+        logSuspiciousActivity(`Large point increase for ${username}`, {
+          points: points,
+          reason: reason,
+          oldTotal: oldPoints,
+          newTotal: newPoints
+        });
+      }
+      
+      updateUser(username, { points: newPoints }).then(() => {
+        resolve(newPoints);
+      }).catch(reject);
+    }).catch(reject);
+  });
+}
+
+function getTopUsers(limit = 10) {
+  return new Promise((resolve, reject) => {
+    db.all(
+      'SELECT username, display_name, points FROM points ORDER BY points DESC LIMIT ?',
+      [limit],
+      (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      }
+    );
+  });
+}
+
+function getActiveUsers() {
+  return new Promise((resolve, reject) => {
+    const timeout = getCurrentTimestamp() - config.presenceTimeoutSeconds;
+    db.all(
+      'SELECT username FROM points WHERE last_seen_ts > ?',
+      [timeout],
+      (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows.map(row => row.username));
+      }
+    );
+  });
+}
+
+// API Endpoints
+app.get('/top10', async (req, res) => {
+  try {
+    const topUsers = await getTopUsers(10);
+    const response = {
+      generated_at: Date.now(),
+      top: topUsers.map((user, index) => ({
+        rank: index + 1,
+        username: user.username,
+        display_name: user.display_name,
+        points: user.points
+      }))
+    };
+    res.json(response);
+  } catch (error) {
+    console.error('Error fetching top 10:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/clips/pending', authenticateAdmin, async (req, res) => {
+  try {
+    db.all(
+      'SELECT id, submitter, display_name, clip_url, submitted_at FROM clips WHERE status = ? ORDER BY submitted_at DESC',
+      ['pending'],
+      (err, rows) => {
+        if (err) {
+          console.error('Error fetching pending clips:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+        res.json({ pending: rows });
+      }
+    );
+  } catch (error) {
+    console.error('Error fetching pending clips:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/clips/:id/approve', authenticateAdmin, async (req, res) => {
+  try {
+    const clipId = parseInt(req.params.id);
+    const { points = 0, note = '' } = req.body;
+    
+    if (!clipId || points < 0) {
+      return res.status(400).json({ error: 'Invalid clip ID or points' });
+    }
+    
+    // Get clip details
+    db.get('SELECT * FROM clips WHERE id = ? AND status = ?', [clipId, 'pending'], async (err, clip) => {
+      if (err) {
+        console.error('Error fetching clip:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+      
+      if (!clip) {
+        return res.status(404).json({ error: 'Clip not found or already processed' });
+      }
+      
+      // Update clip status
+      const now = getCurrentTimestamp();
+      db.run(
+        'UPDATE clips SET status = ?, reviewer = ?, points_awarded = ?, reviewed_at = ?, note = ? WHERE id = ?',
+        ['approved', 'web-admin', points, now, note, clipId],
+        async (err) => {
+          if (err) {
+            console.error('Error updating clip:', err);
+            return res.status(500).json({ error: 'Internal server error' });
+          }
+          
+          // Award points to submitter
+          if (points > 0) {
+            try {
+              const newTotal = await addPointsToUser(clip.submitter, points, 'clip-approval');
+              
+              // Announce in chat
+              client.say(config.channel, `🎉 @${clip.submitter} submitted a great clip and earned ${points} points! Total: ${newTotal}`);
+              
+              res.json({ ok: true, newPointsTotal: newTotal });
+            } catch (error) {
+              console.error('Error awarding points:', error);
+              res.status(500).json({ error: 'Failed to award points' });
+            }
+          } else {
+            res.json({ ok: true, newPointsTotal: 0 });
+          }
+        }
+      );
+    });
+  } catch (error) {
+    console.error('Error approving clip:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/clips/:id/reject', authenticateAdmin, async (req, res) => {
+  try {
+    const clipId = parseInt(req.params.id);
+    const { note = '' } = req.body;
+    
+    if (!clipId) {
+      return res.status(400).json({ error: 'Invalid clip ID' });
+    }
+    
+    const now = getCurrentTimestamp();
+    db.run(
+      'UPDATE clips SET status = ?, reviewer = ?, reviewed_at = ?, note = ? WHERE id = ?',
+      ['rejected', 'web-admin', now, note, clipId],
+      (err) => {
+        if (err) {
+          console.error('Error rejecting clip:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+        res.json({ ok: true });
+      }
+    );
+  } catch (error) {
+    console.error('Error rejecting clip:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Chat command handlers
+async function handleChatMessage(channel, userstate, message, self) {
+  if (self) return; // Ignore bot's own messages
+  
+  const username = userstate.username;
+  const displayName = userstate['display-name'] || username;
+  const isMod = userstate.mod || userstate['user-type'] === 'mod';
+  const isBroadcaster = userstate['user-id'] === userstate['room-id'];
+  const isAdmin = isMod || isBroadcaster;
+  
+  // Update user presence
+  const now = getCurrentTimestamp();
+  let user = await getUser(username);
+  if (!user) {
+    await createUser(username, displayName);
+    user = await getUser(username);
+  }
+  
+  // Update last seen and message count
+  await updateUser(username, {
+    last_seen_ts: now,
+    message_count: (user.message_count || 0) + 1,
+    display_name: displayName
+  });
+  
+  // Award chat points (with anti-spam measures)
+  const timeSinceLastMessage = now - (user.last_message_ts || 0);
+  const timeSinceHourReset = now - (user.chat_points_hour_reset_ts || 0);
+  
+  if (timeSinceLastMessage >= config.minSecondsBetweenChatPoints) {
+    let chatPointsThisHour = user.chat_points_last_hour || 0;
+    
+    // Reset hourly counter if needed
+    if (timeSinceHourReset >= 3600) {
+      chatPointsThisHour = 0;
+    }
+    
+    if (chatPointsThisHour < config.maxChatPointsPerHour) {
+      chatPointsThisHour += config.pointsPerMessage;
+      const newTotal = await addPointsToUser(username, config.pointsPerMessage, 'chat-message');
+      
+      await updateUser(username, {
+        last_message_ts: now,
+        chat_points_last_hour: chatPointsThisHour,
+        chat_points_hour_reset_ts: timeSinceHourReset >= 3600 ? now : user.chat_points_hour_reset_ts
+      });
+    }
+  }
+  
+  // Parse commands
+  const args = message.trim().split(' ');
+  const command = args[0].toLowerCase();
+  
+  switch (command) {
+    case '!punkte':
+    case '!points':
+      const userPoints = await getUser(username);
+      client.say(channel, `@${username} hat ${userPoints.points} Punkte! 🎯`);
+      break;
+      
+    case '!top':
+    case '!leaderboard':
+      try {
+        const topUsers = await getTopUsers(5);
+        const leaderboard = topUsers.map((user, index) => 
+          `${index + 1}. ${user.display_name || user.username}: ${user.points}`
+        ).join(' | ');
+        client.say(channel, `🏆 Top 5: ${leaderboard}`);
+      } catch (error) {
+        console.error('Error fetching leaderboard:', error);
+      }
+      break;
+      
+    case '!submitclip':
+      if (args.length < 2) {
+        client.say(channel, `@${username} Usage: !submitclip <clip_url>`);
+        break;
+      }
+      
+      const clipUrl = args[1];
+      if (!isValidClipUrl(clipUrl)) {
+        client.say(channel, `@${username} Bitte gib eine gültige Twitch Clip URL an!`);
+        break;
+      }
+      
+      // Check daily limit
+      const todayStart = Math.floor(Date.now() / (24 * 60 * 60 * 1000)) * (24 * 60 * 60 * 1000);
+      db.get(
+        'SELECT COUNT(*) as count FROM clips WHERE submitter = ? AND submitted_at > ?',
+        [username.toLowerCase(), Math.floor(todayStart / 1000)],
+        (err, result) => {
+          if (err) {
+            console.error('Error checking clip limit:', err);
+            return;
+          }
+          
+          if (result.count >= config.maxClipsPerDay) {
+            client.say(channel, `@${username} Du hast bereits ${config.maxClipsPerDay} Clips heute eingereicht!`);
+            return;
+          }
+          
+          // Check for duplicate URL
+          db.get('SELECT id FROM clips WHERE clip_url = ?', [clipUrl], (err, existing) => {
+            if (err) {
+              console.error('Error checking duplicate clip:', err);
+              return;
+            }
+            
+            if (existing) {
+              client.say(channel, `@${username} Dieser Clip wurde bereits eingereicht!`);
+              return;
+            }
+            
+            // Submit clip
+            const clipId = extractClipId(clipUrl);
+            db.run(
+              'INSERT INTO clips (submitter, display_name, clip_url, clip_id, submitted_at) VALUES (?, ?, ?, ?, ?)',
+              [username.toLowerCase(), displayName, clipUrl, clipId, now],
+              function(err) {
+                if (err) {
+                  console.error('Error submitting clip:', err);
+                  client.say(channel, `@${username} Fehler beim Einreichen des Clips!`);
+                } else {
+                  client.say(channel, `@${username} Clip eingereicht! (ID: ${this.lastID}) Wird von den Mods geprüft.`);
+                }
+              }
+            );
+          });
+        }
+      );
+      break;
+      
+    case '!clips':
+      if (!isAdmin) break;
+      
+      if (args[1] === 'pending') {
+        db.all('SELECT id, submitter, display_name FROM clips WHERE status = ? ORDER BY submitted_at DESC LIMIT 5', ['pending'], (err, rows) => {
+          if (err) {
+            console.error('Error fetching pending clips:', err);
+            return;
+          }
+          
+          if (rows.length === 0) {
+            client.say(channel, 'Keine ausstehenden Clips!');
+          } else {
+            const clipsList = rows.map(clip => `${clip.id}: @${clip.submitter}`).join(', ');
+            client.say(channel, `Ausstehende Clips: ${clipsList}`);
+          }
+        });
+      }
+      break;
+      
+    case '!clipapprove':
+      if (!isAdmin) break;
+      
+      if (args.length < 3) {
+        client.say(channel, `@${username} Usage: !clipapprove <id> <points> [note]`);
+        break;
+      }
+      
+      const approveId = parseInt(args[1]);
+      const approvePoints = parseInt(args[2]);
+      const approveNote = args.slice(3).join(' ') || '';
+      
+      if (isNaN(approveId) || isNaN(approvePoints) || approvePoints < 0) {
+        client.say(channel, `@${username} Ungültige ID oder Punkte!`);
+        break;
+      }
+      
+      // Approve clip via database
+      db.get('SELECT * FROM clips WHERE id = ? AND status = ?', [approveId, 'pending'], async (err, clip) => {
+        if (err) {
+          console.error('Error fetching clip for approval:', err);
+          return;
+        }
+        
+        if (!clip) {
+          client.say(channel, `@${username} Clip ${approveId} nicht gefunden oder bereits bearbeitet!`);
+          return;
+        }
+        
+        // Update clip
+        db.run(
+          'UPDATE clips SET status = ?, reviewer = ?, points_awarded = ?, reviewed_at = ?, note = ? WHERE id = ?',
+          ['approved', username, approvePoints, now, approveNote, approveId],
+          async (err) => {
+            if (err) {
+              console.error('Error approving clip:', err);
+              client.say(channel, `@${username} Fehler beim Approven des Clips!`);
+              return;
+            }
+            
+            // Award points
+            if (approvePoints > 0) {
+              try {
+                const newTotal = await addPointsToUser(clip.submitter, approvePoints, 'clip-approval-chat');
+                client.say(channel, `✅ Clip ${approveId} approved! @${clip.submitter} +${approvePoints} Punkte (Total: ${newTotal})`);
+              } catch (error) {
+                console.error('Error awarding points:', error);
+                client.say(channel, `@${username} Fehler beim Verteilen der Punkte!`);
+              }
+            } else {
+              client.say(channel, `✅ Clip ${approveId} approved! @${clip.submitter} keine Punkte.`);
+            }
+          }
+        );
+      });
+      break;
+      
+    case '!clipreject':
+      if (!isAdmin) break;
+      
+      if (args.length < 2) {
+        client.say(channel, `@${username} Usage: !clipreject <id> [note]`);
+        break;
+      }
+      
+      const rejectId = parseInt(args[1]);
+      const rejectNote = args.slice(2).join(' ') || '';
+      
+      if (isNaN(rejectId)) {
+        client.say(channel, `@${username} Ungültige ID!`);
+        break;
+      }
+      
+      db.run(
+        'UPDATE clips SET status = ?, reviewer = ?, reviewed_at = ?, note = ? WHERE id = ?',
+        ['rejected', username, now, rejectNote, rejectId],
+        (err) => {
+          if (err) {
+            console.error('Error rejecting clip:', err);
+            client.say(channel, `@${username} Fehler beim Ablehnen des Clips!`);
+          } else {
+            client.say(channel, `❌ Clip ${rejectId} rejected.`);
+          }
+        }
+      );
+      break;
+      
+    case '!give':
+      if (!isAdmin) break;
+      
+      if (args.length < 3) {
+        client.say(channel, `@${username} Usage: !give <user> <amount>`);
+        break;
+      }
+      
+      const targetUser = args[1].toLowerCase().replace('@', '');
+      const giveAmount = parseInt(args[2]);
+      
+      if (isNaN(giveAmount) || giveAmount <= 0) {
+        client.say(channel, `@${username} Ungültige Punkte-Anzahl!`);
+        break;
+      }
+      
+      try {
+        const newTotal = await addPointsToUser(targetUser, giveAmount, 'admin-give');
+        client.say(channel, `🎁 @${targetUser} +${giveAmount} Punkte! Total: ${newTotal}`);
+      } catch (error) {
+        console.error('Error giving points:', error);
+        client.say(channel, `@${username} Fehler beim Verteilen der Punkte!`);
+      }
+      break;
+      
+    case '!dropall':
+      if (!isAdmin) break;
+      
+      if (args.length < 2) {
+        client.say(channel, `@${username} Usage: !dropall <amount>`);
+        break;
+      }
+      
+      const dropAmount = parseInt(args[2]);
+      
+      if (isNaN(dropAmount) || dropAmount <= 0) {
+        client.say(channel, `@${username} Ungültige Punkte-Anzahl!`);
+        break;
+      }
+      
+      try {
+        const activeUsers = await getActiveUsers();
+        if (activeUsers.length === 0) {
+          client.say(channel, `@${username} Keine aktiven User gefunden!`);
+          break;
+        }
+        
+        for (const activeUser of activeUsers) {
+          await addPointsToUser(activeUser, dropAmount, 'admin-dropall');
+        }
+        
+        client.say(channel, `🎊 Alle ${activeUsers.length} aktiven User haben +${dropAmount} Punkte erhalten!`);
+      } catch (error) {
+        console.error('Error dropping points to all:', error);
+        client.say(channel, `@${username} Fehler beim Verteilen der Punkte!`);
+      }
+      break;
+      
+    case '!droprandom':
+      if (!isAdmin) break;
+      
+      if (args.length < 3) {
+        client.say(channel, `@${username} Usage: !droprandom <amount> <count>`);
+        break;
+      }
+      
+      const randomAmount = parseInt(args[1]);
+      const randomCount = parseInt(args[2]);
+      
+      if (isNaN(randomAmount) || isNaN(randomCount) || randomAmount <= 0 || randomCount <= 0) {
+        client.say(channel, `@${username} Ungültige Parameter!`);
+        break;
+      }
+      
+      try {
+        const activeUsers = await getActiveUsers();
+        if (activeUsers.length === 0) {
+          client.say(channel, `@${username} Keine aktiven User gefunden!`);
+          break;
+        }
+        
+        // Shuffle and take random users
+        const shuffled = activeUsers.sort(() => 0.5 - Math.random());
+        const selectedUsers = shuffled.slice(0, Math.min(randomCount, activeUsers.length));
+        
+        for (const selectedUser of selectedUsers) {
+          await addPointsToUser(selectedUser, randomAmount, 'admin-droprandom');
+        }
+        
+        client.say(channel, `🎲 ${selectedUsers.length} zufällige User haben +${randomAmount} Punkte erhalten!`);
+      } catch (error) {
+        console.error('Error dropping random points:', error);
+        client.say(channel, `@${username} Fehler beim Verteilen der Punkte!`);
+      }
+      break;
+  }
+}
+
+// Utility functions for clip handling
+function isValidClipUrl(url) {
+  const twitchClipPattern = /^https?:\/\/(clips\.twitch\.tv\/[^\/\s]+|www\.twitch\.tv\/[^\/\s]+\/clip\/[^\/\s]+)/i;
+  return twitchClipPattern.test(url);
+}
+
+function extractClipId(url) {
+  const match = url.match(/\/clip\/([^\/\s]+)|\/([^\/\s]+)$/);
+  return match ? (match[1] || match[2]) : null;
+}
+
+// Viewtime tracking
+async function updateViewtime() {
+  try {
+    const timeout = getCurrentTimestamp() - config.presenceTimeoutSeconds;
+    
+    db.all('SELECT * FROM points WHERE last_seen_ts > ?', [timeout], async (err, activeUsers) => {
+      if (err) {
+        console.error('Error fetching active users for viewtime:', err);
+        return;
+      }
+      
+      for (const user of activeUsers) {
+        const newViewSeconds = user.view_seconds + config.heartbeatSeconds;
+        let pointsToAdd = 0;
+        let remainingViewSeconds = newViewSeconds;
+        
+        // Calculate points from viewtime
+        while (remainingViewSeconds >= config.viewtimeSecondsPerPoint) {
+          pointsToAdd += 1;
+          remainingViewSeconds -= config.viewtimeSecondsPerPoint;
+        }
+        
+        // Update user with new viewtime and points
+        if (pointsToAdd > 0) {
+          await addPointsToUser(user.username, pointsToAdd, 'viewtime');
+        }
+        
+        await updateUser(user.username, { view_seconds: remainingViewSeconds });
+      }
+    });
+  } catch (error) {
+    console.error('Error updating viewtime:', error);
+  }
+}
+
+// Monthly cron job for top 2 winners
+function runMonthlyJob() {
+  const now = new Date();
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const monthKey = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`;
+  
+  console.log(`Running monthly job for ${monthKey}`);
+  
+  // Get top 2 users from last month
+  db.all(
+    'SELECT username, display_name, points FROM points WHERE points > 0 ORDER BY points DESC LIMIT 2',
+    [],
+    async (err, topUsers) => {
+      if (err) {
+        console.error('Error fetching top users for monthly job:', err);
+        return;
+      }
+      
+      const now = getCurrentTimestamp();
+      
+      for (let i = 0; i < topUsers.length; i++) {
+        const user = topUsers[i];
+        
+        db.run(
+          'INSERT INTO winners (month, rank, username, display_name, points, awarded_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [monthKey, i + 1, user.username, user.display_name, user.points, now],
+          function(err) {
+            if (err) {
+              console.error('Error saving winner:', err);
+            }
+          }
+        );
+      }
+      
+      // Announce winners in chat
+      if (topUsers.length > 0) {
+        const announcement = topUsers.map((user, index) => 
+          `${index + 1}. ${user.display_name || user.username} (${user.points} Punkte)`
+        ).join(' | ');
+        
+        client.say(config.channel, `🏆 Monats-Sieger ${monthKey}: ${announcement}`);
+      }
+      
+      // Reset all points (optional - you might want to keep history)
+      db.run('UPDATE points SET points = 0, view_seconds = 0', (err) => {
+        if (err) {
+          console.error('Error resetting points:', err);
+        } else {
+          console.log('Points reset for new month');
+          client.say(config.channel, '🎯 Alle Punkte wurden für den neuen Monat zurückgesetzt!');
+        }
+      });
+    }
+  );
+}
+
+// Event handlers
+client.on('message', handleChatMessage);
+
+client.on('connected', (addr, port) => {
+  console.log(`Connected to Twitch IRC at ${addr}:${port}`);
+  client.say(config.channel, 'Bot ist online! 🚀');
+});
+
+// Start viewtime tracking
+setInterval(updateViewtime, config.heartbeatSeconds * 1000);
+
+// Monthly cron job (1st of each month at 00:00)
+cron.schedule('0 0 1 * *', runMonthlyJob, {
+  timezone: config.timezone
+});
+
+// Start Express server
+app.listen(config.expressPort, () => {
+  console.log(`Express server running on port ${config.expressPort}`);
+  console.log(`Overlay URL: http://localhost:${config.expressPort}/overlay.html`);
+  console.log(`Admin Dashboard: http://localhost:${config.expressPort}/admin/clips.html?admin_key=${config.adminKey}`);
+});
+
+// Connect to Twitch
+client.connect().catch(console.error);
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('Shutting down...');
+  client.disconnect();
+  db.close();
+  process.exit(0);
+});
+
+module.exports = { app, client, db };
