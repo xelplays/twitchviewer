@@ -1,5 +1,6 @@
 require('dotenv').config();
-const { ChatClient } = require('twitch-chat-client');
+const { ChatClient } = require('@twurple/chat');
+const { StaticAuthProvider } = require('@twurple/auth');
 const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
@@ -71,12 +72,9 @@ const initDb = require('./migrations/init_db');
 initDb();
 
 // Twitch Chat Client Configuration
+const authProvider = new StaticAuthProvider(config.twitchClientId, config.botOauth.substring(6));
 const chatClient = new ChatClient({
-  authProvider: {
-    getAccessToken: async () => config.botOauth.substring(6), // Remove 'oauth:' prefix
-    getAppAccessToken: async () => null,
-    getClientId: async () => config.twitchClientId
-  },
+  authProvider,
   channels: [config.channel],
   logger: {
     minLevel: 'info'
@@ -588,16 +586,16 @@ async function handleChatMessage({ channel, user, message, msg }) {
   
   // Update user presence
   const now = getCurrentTimestamp();
-  let user = await getUser(username);
-  if (!user) {
+  let userData = await getUser(username);
+  if (!userData) {
     await createUser(username, displayName);
-    user = await getUser(username);
+    userData = await getUser(username);
   }
   
   // Update last seen and message count
   await updateUser(username, {
     last_seen_ts: now,
-    message_count: (user.message_count || 0) + 1,
+    message_count: (userData.message_count || 0) + 1,
     display_name: displayName
   });
   
@@ -1077,8 +1075,8 @@ async function sendChatMessage(message) {
 }
 
 // Event handlers
-chatClient.onMessage(async (channel, user, message, msg) => {
-  await handleChatMessage({ channel, user, message, msg });
+chatClient.onMessage(async (channel, user, text, msg) => {
+  await handleChatMessage({ channel, user, message: text, msg });
 });
 
 chatClient.onConnect(async () => {
