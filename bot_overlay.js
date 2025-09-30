@@ -1049,13 +1049,18 @@ function runMonthlyJob() {
 
 // Helper function to send messages (tries multiple methods)
 function sendChatMessage(message) {
+  console.log('🔍 sendChatMessage called with:', message);
   try {
-    sendChatMessage(message);
+    console.log('🔍 Trying chat.say...');
+    chat.say(message);
+    console.log('✅ chat.say called successfully');
     return true;
   } catch (error) {
     console.log('❌ chat.say failed:', error.message);
     try {
+      console.log('🔍 Trying chat.send...');
       chat.send(message);
+      console.log('✅ chat.send called successfully');
       return true;
     } catch (error2) {
       console.log('❌ chat.send also failed:', error2.message);
