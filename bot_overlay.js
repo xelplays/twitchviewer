@@ -1,6 +1,6 @@
 require('dotenv').config();
-const { ChatClient } = require('twitch-chat-client');
-const { StaticAuthProvider } = require('twitch-auth');
+const { ChatClient } = require('@twurple/chat');
+const { StaticAuthProvider } = require('@twurple/auth');
 const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
