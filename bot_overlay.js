@@ -978,20 +978,20 @@ async function updateViewtime() {
     // Get current viewers from Twitch API
     const currentViewers = await getCurrentViewers();
     
-    // If we can't get viewers from API, use chat activity only
-    let eligibleUsers;
+    // Only track viewtime for users who:
+    // 1. Have written in chat at least once
+    // 2. Are currently in the viewer list
+    // This ensures 100% accuracy - no guessing!
+    const eligibleUsers = chatActiveUsers.filter(user => 
+      currentViewers.includes(user.username.toLowerCase())
+    );
+    
+    console.log(`Tracking viewtime for ${eligibleUsers.length} users (${currentViewers.length} total viewers, ${chatActiveUsers.length} chat-active users)`);
+    
+    // If no viewers found, don't track anything (safer approach)
     if (currentViewers.length === 0) {
-      // Fallback: track all users who have been active in chat recently
-      eligibleUsers = chatActiveUsers;
-      console.log(`Tracking viewtime for ${eligibleUsers.length} users (chat-only mode)`);
-    } else {
-      // Only track viewtime for users who:
-      // 1. Have written in chat at least once
-      // 2. Are currently in the viewer list
-      eligibleUsers = chatActiveUsers.filter(user => 
-        currentViewers.includes(user.username.toLowerCase())
-      );
-      console.log(`Tracking viewtime for ${eligibleUsers.length} users (${currentViewers.length} total viewers)`);
+      console.log('No viewers found via API - skipping viewtime tracking for safety');
+      return;
     }
     
     for (const user of eligibleUsers) {
@@ -1064,7 +1064,8 @@ async function getCurrentViewers() {
     return viewers;
   } catch (error) {
     console.error('Error fetching current viewers:', error);
-    // Fallback: use chat activity only
+    console.log('Cannot track viewtime without viewer list - API error');
+    // Return empty array to skip viewtime tracking for safety
     return [];
   }
 }
