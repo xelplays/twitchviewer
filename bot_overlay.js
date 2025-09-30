@@ -286,7 +286,7 @@ app.post('/api/clips/:id/approve', authenticateAdmin, async (req, res) => {
               const newTotal = await addPointsToUser(clip.submitter, points, 'clip-approval');
               
               // Announce in chat
-              chat.say(config.channel, `🎉 @${clip.submitter} submitted a great clip and earned ${points} points! Total: ${newTotal}`);
+              chat.say( `🎉 @${clip.submitter} submitted a great clip and earned ${points} points! Total: ${newTotal}`);
               
               res.json({ ok: true, newPointsTotal: newTotal });
             } catch (error) {
@@ -545,14 +545,14 @@ app.post('/api/admin/end-month', requireAdmin, async (req, res) => {
       `${index + 1}. ${winner.display_name || winner.username} (${winner.points} Punkte)`
     ).join(' | ');
     
-    chat.say(config.channel, `🏆 Monats-Sieger ${currentMonth}: ${announcement}`);
+    chat.say( `🏆 Monats-Sieger ${currentMonth}: ${announcement}`);
     
     // Reset all points
     db.run('UPDATE points SET points = 0, view_seconds = 0', (err) => {
       if (err) {
         console.error('Error resetting points:', err);
       } else {
-        chat.say(config.channel, '🎯 Alle Punkte wurden für den neuen Monat zurückgesetzt!');
+        chat.say( '🎯 Alle Punkte wurden für den neuen Monat zurückgesetzt!');
       }
     });
     
@@ -624,7 +624,7 @@ async function handleChatMessage(msg) {
     case '!punkte':
     case '!points':
       const userPoints = await getUser(username);
-      chat.say(channel, `@${username} hat ${userPoints.points} Punkte! 🎯`);
+      chat.say( `@${username} hat ${userPoints.points} Punkte! 🎯`);
       break;
       
     case '!top':
@@ -634,7 +634,7 @@ async function handleChatMessage(msg) {
         const leaderboard = topUsers.map((user, index) => 
           `${index + 1}. ${user.display_name || user.username}: ${user.points}`
         ).join(' | ');
-        chat.say(channel, `🏆 Top 5: ${leaderboard}`);
+        chat.say( `🏆 Top 5: ${leaderboard}`);
       } catch (error) {
         console.error('Error fetching leaderboard:', error);
       }
@@ -642,13 +642,13 @@ async function handleChatMessage(msg) {
       
     case '!submitclip':
       if (args.length < 2) {
-        chat.say(channel, `@${username} Usage: !submitclip <clip_url>`);
+        chat.say( `@${username} Usage: !submitclip <clip_url>`);
         break;
       }
       
       const clipUrl = args[1];
       if (!isValidClipUrl(clipUrl)) {
-        chat.say(channel, `@${username} Bitte gib eine gültige Twitch Clip URL an!`);
+        chat.say( `@${username} Bitte gib eine gültige Twitch Clip URL an!`);
         break;
       }
       
@@ -664,7 +664,7 @@ async function handleChatMessage(msg) {
           }
           
           if (result.count >= config.maxClipsPerDay) {
-            chat.say(channel, `@${username} Du hast bereits ${config.maxClipsPerDay} Clips heute eingereicht!`);
+            chat.say( `@${username} Du hast bereits ${config.maxClipsPerDay} Clips heute eingereicht!`);
             return;
           }
           
@@ -678,16 +678,16 @@ async function handleChatMessage(msg) {
             if (existing) {
               // Check if the same user is submitting the same clip
               if (existing.submitter === username.toLowerCase()) {
-                chat.say(channel, `@${username} Du hast diesen Clip bereits eingereicht!`);
+                chat.say( `@${username} Du hast diesen Clip bereits eingereicht!`);
               } else {
-                chat.say(channel, `@${username} Dieser Clip wurde bereits von jemand anderem eingereicht!`);
+                chat.say( `@${username} Dieser Clip wurde bereits von jemand anderem eingereicht!`);
               }
               return;
             }
             
             // Validate that the user is the creator of the clip (basic check)
             if (!validateClipOwnership(clipUrl, username)) {
-              chat.say(channel, `@${username} Du kannst nur deine eigenen Clips einreichen!`);
+              chat.say( `@${username} Du kannst nur deine eigenen Clips einreichen!`);
               return;
             }
             
@@ -699,9 +699,9 @@ async function handleChatMessage(msg) {
               function(err) {
                 if (err) {
                   console.error('Error submitting clip:', err);
-                  chat.say(channel, `@${username} Fehler beim Einreichen des Clips!`);
+                  chat.say( `@${username} Fehler beim Einreichen des Clips!`);
                 } else {
-                  chat.say(channel, `@${username} Clip eingereicht! (ID: ${this.lastID}) Wird von den Mods geprüft.`);
+                  chat.say( `@${username} Clip eingereicht! (ID: ${this.lastID}) Wird von den Mods geprüft.`);
                 }
               }
             );
@@ -721,10 +721,10 @@ async function handleChatMessage(msg) {
           }
           
           if (rows.length === 0) {
-            chat.say(channel, 'Keine ausstehenden Clips!');
+            chat.say( 'Keine ausstehenden Clips!');
           } else {
             const clipsList = rows.map(clip => `${clip.id}: @${clip.submitter}`).join(', ');
-            chat.say(channel, `Ausstehende Clips: ${clipsList}`);
+            chat.say( `Ausstehende Clips: ${clipsList}`);
           }
         });
       }
@@ -734,7 +734,7 @@ async function handleChatMessage(msg) {
       if (!isAdmin) break;
       
       if (args.length < 3) {
-        chat.say(channel, `@${username} Usage: !clipapprove <id> <points> [note]`);
+        chat.say( `@${username} Usage: !clipapprove <id> <points> [note]`);
         break;
       }
       
@@ -743,7 +743,7 @@ async function handleChatMessage(msg) {
       const approveNote = args.slice(3).join(' ') || '';
       
       if (isNaN(approveId) || isNaN(approvePoints) || approvePoints < 0) {
-        chat.say(channel, `@${username} Ungültige ID oder Punkte!`);
+        chat.say( `@${username} Ungültige ID oder Punkte!`);
         break;
       }
       
@@ -755,7 +755,7 @@ async function handleChatMessage(msg) {
         }
         
         if (!clip) {
-          chat.say(channel, `@${username} Clip ${approveId} nicht gefunden oder bereits bearbeitet!`);
+          chat.say( `@${username} Clip ${approveId} nicht gefunden oder bereits bearbeitet!`);
           return;
         }
         
@@ -766,7 +766,7 @@ async function handleChatMessage(msg) {
           async (err) => {
             if (err) {
               console.error('Error approving clip:', err);
-              chat.say(channel, `@${username} Fehler beim Approven des Clips!`);
+              chat.say( `@${username} Fehler beim Approven des Clips!`);
               return;
             }
             
@@ -774,13 +774,13 @@ async function handleChatMessage(msg) {
             if (approvePoints > 0) {
               try {
                 const newTotal = await addPointsToUser(clip.submitter, approvePoints, 'clip-approval-chat');
-                chat.say(channel, `✅ Clip ${approveId} approved! @${clip.submitter} +${approvePoints} Punkte (Total: ${newTotal})`);
+                chat.say( `✅ Clip ${approveId} approved! @${clip.submitter} +${approvePoints} Punkte (Total: ${newTotal})`);
               } catch (error) {
                 console.error('Error awarding points:', error);
-                chat.say(channel, `@${username} Fehler beim Verteilen der Punkte!`);
+                chat.say( `@${username} Fehler beim Verteilen der Punkte!`);
               }
             } else {
-              chat.say(channel, `✅ Clip ${approveId} approved! @${clip.submitter} keine Punkte.`);
+              chat.say( `✅ Clip ${approveId} approved! @${clip.submitter} keine Punkte.`);
             }
           }
         );
@@ -791,7 +791,7 @@ async function handleChatMessage(msg) {
       if (!isAdmin) break;
       
       if (args.length < 2) {
-        chat.say(channel, `@${username} Usage: !clipreject <id> [note]`);
+        chat.say( `@${username} Usage: !clipreject <id> [note]`);
         break;
       }
       
@@ -799,7 +799,7 @@ async function handleChatMessage(msg) {
       const rejectNote = args.slice(2).join(' ') || '';
       
       if (isNaN(rejectId)) {
-        chat.say(channel, `@${username} Ungültige ID!`);
+        chat.say( `@${username} Ungültige ID!`);
         break;
       }
       
@@ -809,9 +809,9 @@ async function handleChatMessage(msg) {
         (err) => {
           if (err) {
             console.error('Error rejecting clip:', err);
-            chat.say(channel, `@${username} Fehler beim Ablehnen des Clips!`);
+            chat.say( `@${username} Fehler beim Ablehnen des Clips!`);
           } else {
-            chat.say(channel, `❌ Clip ${rejectId} rejected.`);
+            chat.say( `❌ Clip ${rejectId} rejected.`);
           }
         }
       );
@@ -821,7 +821,7 @@ async function handleChatMessage(msg) {
       if (!isAdmin) break;
       
       if (args.length < 3) {
-        chat.say(channel, `@${username} Usage: !give <user> <amount>`);
+        chat.say( `@${username} Usage: !give <user> <amount>`);
         break;
       }
       
@@ -829,16 +829,16 @@ async function handleChatMessage(msg) {
       const giveAmount = parseInt(args[2]);
       
       if (isNaN(giveAmount) || giveAmount <= 0) {
-        chat.say(channel, `@${username} Ungültige Punkte-Anzahl!`);
+        chat.say( `@${username} Ungültige Punkte-Anzahl!`);
         break;
       }
       
       try {
         const newTotal = await addPointsToUser(targetUser, giveAmount, 'admin-give');
-        chat.say(channel, `🎁 @${targetUser} +${giveAmount} Punkte! Total: ${newTotal}`);
+        chat.say( `🎁 @${targetUser} +${giveAmount} Punkte! Total: ${newTotal}`);
       } catch (error) {
         console.error('Error giving points:', error);
-        chat.say(channel, `@${username} Fehler beim Verteilen der Punkte!`);
+        chat.say( `@${username} Fehler beim Verteilen der Punkte!`);
       }
       break;
       
@@ -846,21 +846,21 @@ async function handleChatMessage(msg) {
       if (!isAdmin) break;
       
       if (args.length < 2) {
-        chat.say(channel, `@${username} Usage: !dropall <amount>`);
+        chat.say( `@${username} Usage: !dropall <amount>`);
         break;
       }
       
       const dropAmount = parseInt(args[2]);
       
       if (isNaN(dropAmount) || dropAmount <= 0) {
-        chat.say(channel, `@${username} Ungültige Punkte-Anzahl!`);
+        chat.say( `@${username} Ungültige Punkte-Anzahl!`);
         break;
       }
       
       try {
         const activeUsers = await getActiveUsers();
         if (activeUsers.length === 0) {
-          chat.say(channel, `@${username} Keine aktiven User gefunden!`);
+          chat.say( `@${username} Keine aktiven User gefunden!`);
           break;
         }
         
@@ -868,10 +868,10 @@ async function handleChatMessage(msg) {
           await addPointsToUser(activeUser, dropAmount, 'admin-dropall');
         }
         
-        chat.say(channel, `🎊 Alle ${activeUsers.length} aktiven User haben +${dropAmount} Punkte erhalten!`);
+        chat.say( `🎊 Alle ${activeUsers.length} aktiven User haben +${dropAmount} Punkte erhalten!`);
       } catch (error) {
         console.error('Error dropping points to all:', error);
-        chat.say(channel, `@${username} Fehler beim Verteilen der Punkte!`);
+        chat.say( `@${username} Fehler beim Verteilen der Punkte!`);
       }
       break;
       
@@ -879,7 +879,7 @@ async function handleChatMessage(msg) {
       if (!isAdmin) break;
       
       if (args.length < 3) {
-        chat.say(channel, `@${username} Usage: !droprandom <amount> <count>`);
+        chat.say( `@${username} Usage: !droprandom <amount> <count>`);
         break;
       }
       
@@ -887,14 +887,14 @@ async function handleChatMessage(msg) {
       const randomCount = parseInt(args[2]);
       
       if (isNaN(randomAmount) || isNaN(randomCount) || randomAmount <= 0 || randomCount <= 0) {
-        chat.say(channel, `@${username} Ungültige Parameter!`);
+        chat.say( `@${username} Ungültige Parameter!`);
         break;
       }
       
       try {
         const activeUsers = await getActiveUsers();
         if (activeUsers.length === 0) {
-          chat.say(channel, `@${username} Keine aktiven User gefunden!`);
+          chat.say( `@${username} Keine aktiven User gefunden!`);
           break;
         }
         
@@ -906,10 +906,10 @@ async function handleChatMessage(msg) {
           await addPointsToUser(selectedUser, randomAmount, 'admin-droprandom');
         }
         
-        chat.say(channel, `🎲 ${selectedUsers.length} zufällige User haben +${randomAmount} Punkte erhalten!`);
+        chat.say( `🎲 ${selectedUsers.length} zufällige User haben +${randomAmount} Punkte erhalten!`);
       } catch (error) {
         console.error('Error dropping random points:', error);
-        chat.say(channel, `@${username} Fehler beim Verteilen der Punkte!`);
+        chat.say( `@${username} Fehler beim Verteilen der Punkte!`);
       }
       break;
   }
@@ -1031,7 +1031,7 @@ function runMonthlyJob() {
           `${index + 1}. ${user.display_name || user.username} (${user.points} Punkte)`
         ).join(' | ');
         
-        chat.say(config.channel, `🏆 Monats-Sieger ${monthKey}: ${announcement}`);
+        chat.say( `🏆 Monats-Sieger ${monthKey}: ${announcement}`);
       }
       
       // Reset all points (optional - you might want to keep history)
@@ -1040,7 +1040,7 @@ function runMonthlyJob() {
           console.error('Error resetting points:', err);
         } else {
           console.log('Points reset for new month');
-          chat.say(config.channel, '🎯 Alle Punkte wurden für den neuen Monat zurückgesetzt!');
+          chat.say( '🎯 Alle Punkte wurden für den neuen Monat zurückgesetzt!');
         }
       });
     }
@@ -1052,7 +1052,7 @@ chat.on('PRIVMSG', handleChatMessage);
 
 chat.on('connected', () => {
   console.log(`Connected to Twitch IRC`);
-  chat.say(config.channel, 'Bot ist online! 🚀');
+  chat.say('Bot ist online! 🚀');
 });
 
 // Start viewtime tracking
