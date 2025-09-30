@@ -679,9 +679,9 @@ async function handleChatMessage({ channel, user, message, msg }) {
       
     case '!dice':
       const roll = Math.floor(Math.random() * 6) + 1;
-      const points = roll * 2; // 2-12 Punkte je nach Würfel
-      await addPointsToUser(username, points, 'dice_game');
-      sendChatMessage(`🎲 @${username} würfelt eine ${roll}! +${points} Punkte!`);
+      const dicePoints = roll * 2; // 2-12 Punkte je nach Würfel
+      await addPointsToUser(username, dicePoints, 'dice_game');
+      sendChatMessage(`🎲 @${username} würfelt eine ${roll}! +${dicePoints} Punkte!`);
       break;
       
     case '!lottery':
