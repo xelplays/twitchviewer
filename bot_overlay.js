@@ -976,14 +976,21 @@ async function updateViewtime() {
     // Get current viewers from Twitch API
     const currentViewers = await getCurrentViewers();
     
-    // Only track viewtime for users who:
-    // 1. Have written in chat at least once
-    // 2. Are currently in the viewer list
-    const eligibleUsers = chatActiveUsers.filter(user => 
-      currentViewers.includes(user.username.toLowerCase())
-    );
-    
-    console.log(`Tracking viewtime for ${eligibleUsers.length} users (${currentViewers.length} total viewers)`);
+    // If we can't get viewers from API, use chat activity only
+    let eligibleUsers;
+    if (currentViewers.length === 0) {
+      // Fallback: track all users who have been active in chat recently
+      eligibleUsers = chatActiveUsers;
+      console.log(`Tracking viewtime for ${eligibleUsers.length} users (chat-only mode)`);
+    } else {
+      // Only track viewtime for users who:
+      // 1. Have written in chat at least once
+      // 2. Are currently in the viewer list
+      eligibleUsers = chatActiveUsers.filter(user => 
+        currentViewers.includes(user.username.toLowerCase())
+      );
+      console.log(`Tracking viewtime for ${eligibleUsers.length} users (${currentViewers.length} total viewers)`);
+    }
     
     for (const user of eligibleUsers) {
       const newViewSeconds = user.view_seconds + config.heartbeatSeconds;
@@ -1026,33 +1033,10 @@ async function getChatActiveUsers() {
 // Get current viewers from Twitch API
 async function getCurrentViewers() {
   try {
-    // Use Twitch Helix API to get current viewers
-    const response = await axios.get(`https://api.twitch.tv/helix/streams?user_login=${config.channel}`, {
-      headers: {
-        'Client-ID': config.twitchClientId,
-        'Authorization': `Bearer ${config.botOauth.substring(6)}`
-      }
-    });
-    
-    if (response.data.data.length === 0) {
-      console.log('Stream is offline, no viewers to track');
-      return [];
-    }
-    
-    const streamId = response.data.data[0].id;
-    
-    // Get chatters (viewers)
-    const chattersResponse = await axios.get(`https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${streamId}&moderator_id=${streamId}`, {
-      headers: {
-        'Client-ID': config.twitchClientId,
-        'Authorization': `Bearer ${config.botOauth.substring(6)}`
-      }
-    });
-    
-    const viewers = chattersResponse.data.data.map(chatter => chatter.user_login);
-    console.log(`Found ${viewers.length} current viewers`);
-    
-    return viewers;
+    // For now, use chat activity only since we have Client ID / OAuth mismatch
+    // TODO: Fix OAuth token to match Client ID for proper viewer tracking
+    console.log('Using chat-only tracking (OAuth/Client ID mismatch)');
+    return [];
   } catch (error) {
     console.error('Error fetching current viewers:', error);
     // Fallback: use chat activity only
