@@ -77,6 +77,13 @@ const chat = new Chat({
   channels: [config.channel]
 });
 
+// Debug: Check if token and username are properly set
+console.log('Chat Config Debug:');
+console.log('- Username:', config.botUsername);
+console.log('- Token (first 10 chars):', config.botOauth.substring(6, 16));
+console.log('- Channel:', config.channel);
+console.log('- Token length:', config.botOauth.substring(6).length);
+
 // Express app setup
 const app = express();
 app.use(cors());
@@ -1048,22 +1055,24 @@ function runMonthlyJob() {
 }
 
 // Helper function to send messages (tries multiple methods)
-function sendChatMessage(message) {
+async function sendChatMessage(message) {
   console.log('🔍 sendChatMessage called with:', message);
   try {
     console.log('🔍 Trying chat.say...');
-    chat.say(message);
+    await chat.say(message);
     console.log('✅ chat.say called successfully');
     return true;
   } catch (error) {
     console.log('❌ chat.say failed:', error.message);
+    console.log('❌ Error details:', error);
     try {
       console.log('🔍 Trying chat.send...');
-      chat.send(message);
+      await chat.send(message);
       console.log('✅ chat.send called successfully');
       return true;
     } catch (error2) {
       console.log('❌ chat.send also failed:', error2.message);
+      console.log('❌ Error2 details:', error2);
       return false;
     }
   }
@@ -1078,15 +1087,15 @@ chat.on('connected', () => {
   sendChatMessage('Bot ist online! 🚀');
 });
 
-chat.on('CONNECTED', () => {
+chat.on('CONNECTED', async () => {
   console.log(`✅ Connected to Twitch IRC (CONNECTED event)`);
-  sendChatMessage('Bot ist online! 🚀');
+  await sendChatMessage('Bot ist online! 🚀');
 });
 
 // Also try to send message after a delay
-setTimeout(() => {
+setTimeout(async () => {
   console.log('🔍 Trying to send delayed message...');
-  sendChatMessage('Bot ist online! 🚀');
+  await sendChatMessage('Bot ist online! 🚀');
 }, 3000);
 
 // Start viewtime tracking
