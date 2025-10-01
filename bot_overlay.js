@@ -466,7 +466,10 @@ app.get('/api/user/stats', async (req, res) => {
 
 app.get('/api/leaderboard', async (req, res) => {
   try {
+    console.log('API /api/leaderboard called');
     const topUsers = await getTopUsers(50);
+    console.log('Found users:', topUsers.length);
+    
     const response = {
       generated_at: Date.now(),
       top: topUsers.map((user, index) => ({
@@ -476,6 +479,8 @@ app.get('/api/leaderboard', async (req, res) => {
         points: user.points
       }))
     };
+    
+    console.log('Sending response:', response);
     res.json(response);
   } catch (error) {
     console.error('Error fetching leaderboard:', error);

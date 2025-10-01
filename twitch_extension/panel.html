@@ -51,12 +51,35 @@
             gap: 15px;
         }
 
+        .user-stats {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .user-stats h3 {
+            font-size: 14px;
+            margin-bottom: 5px;
+            color: #ffd700;
+        }
+
+        .user-points {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ff6b6b;
+        }
+
         .leaderboard-section {
             flex: 1;
             background: rgba(255, 255, 255, 0.1);
             border-radius: 10px;
             padding: 15px;
             overflow-y: auto;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .leaderboard-item {
@@ -73,6 +96,7 @@
 
         .leaderboard-item:hover {
             background: rgba(255, 255, 255, 0.2);
+            transform: translateX(3px);
         }
 
         .leaderboard-item.rank-1 {
@@ -117,6 +141,8 @@
             background: rgba(255, 255, 255, 0.1);
             border-radius: 10px;
             padding: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .games-title {
@@ -124,6 +150,7 @@
             font-weight: bold;
             margin-bottom: 10px;
             color: #ffd700;
+            text-align: center;
         }
 
         .games-grid {
@@ -134,21 +161,23 @@
 
         .game-item {
             background: rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            padding: 8px;
+            border-radius: 8px;
+            padding: 10px;
             text-align: center;
             font-size: 11px;
             transition: all 0.3s ease;
             cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .game-item:hover {
             background: rgba(255, 255, 255, 0.2);
             transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
 
         .game-emoji {
-            font-size: 16px;
+            font-size: 18px;
             display: block;
             margin-bottom: 4px;
         }
@@ -166,26 +195,7 @@
             background: rgba(255, 0, 0, 0.2);
             border-radius: 8px;
             font-size: 12px;
-        }
-
-        .user-stats {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 10px;
-            margin-bottom: 10px;
-            text-align: center;
-        }
-
-        .user-stats h3 {
-            font-size: 14px;
-            margin-bottom: 5px;
-            color: #ffd700;
-        }
-
-        .user-points {
-            font-size: 18px;
-            font-weight: bold;
-            color: #ff6b6b;
+            border: 1px solid rgba(255, 0, 0, 0.3);
         }
 
         .refresh-info {
@@ -193,6 +203,48 @@
             font-size: 10px;
             opacity: 0.7;
             margin-top: 10px;
+        }
+
+        .cta-button {
+            display: block;
+            width: 100%;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            color: white;
+            text-decoration: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 12px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Scrollbar Styling */
+        .leaderboard-section::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .leaderboard-section::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+        }
+
+        .leaderboard-section::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+        }
+
+        .leaderboard-section::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
         }
     </style>
 </head>
@@ -273,15 +325,25 @@
         // Load leaderboard
         async function loadLeaderboard() {
             try {
+                console.log('Loading leaderboard from API...');
                 const response = await fetch('https://einfachsven.xyz/api/leaderboard');
-                const data = await response.json();
+                console.log('Response status:', response.status);
                 
-                if (data.top) {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('API Response:', data);
+                
+                if (data.top && Array.isArray(data.top)) {
                     // Limit to top 8 for panel display
                     const top8 = data.top.slice(0, 8);
+                    console.log('Displaying top 8:', top8);
                     displayLeaderboard(top8);
                 } else {
-                    throw new Error('Invalid response format');
+                    console.error('Invalid response format - data.top not found or not array:', data);
+                    throw new Error('Invalid response format - missing data.top array');
                 }
             } catch (error) {
                 console.error('Error loading leaderboard:', error);
@@ -336,8 +398,10 @@
                 const gameItem = event.target.closest('.game-item');
                 const originalBg = gameItem.style.background;
                 gameItem.style.background = 'rgba(255, 215, 0, 0.3)';
+                gameItem.style.transform = 'scale(1.1)';
                 setTimeout(() => {
                     gameItem.style.background = originalBg;
+                    gameItem.style.transform = 'scale(1)';
                 }, 1000);
             } else {
                 twitch.rig.log('User not logged in');
