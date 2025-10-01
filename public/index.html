@@ -49,6 +49,36 @@
         .header p {
             font-size: 1.1rem;
             opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .nav-link {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .nav-link.active {
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            color: white;
         }
 
         .status-indicator {
@@ -423,6 +453,11 @@
                 <span class="status-indicator"></span>
                 Live Stream mit interaktivem Leaderboard
             </p>
+            <div class="nav-links">
+                <a href="/" class="nav-link active">🏠 Home</a>
+                <a href="/clips.html" class="nav-link">📹 Clips</a>
+                <a href="/dashboard" class="nav-link">📊 Dashboard</a>
+            </div>
         </div>
 
         <!-- Left Sidebar - Leaderboard -->
