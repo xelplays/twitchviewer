@@ -321,7 +321,7 @@ app.get('/api/clips/public', async (req, res) => {
 app.get('/api/clips/pending', authenticateAdmin, async (req, res) => {
   try {
     db.all(
-      'SELECT id, submitter, display_name, clip_url, submitted_at, title, description, username FROM clips WHERE status = ? ORDER BY submitted_at DESC',
+      'SELECT id, submitter, display_name, clip_url, submitted_at, clip_id, note FROM clips WHERE status = ? ORDER BY submitted_at DESC',
       ['pending'],
       (err, rows) => {
         if (err) {

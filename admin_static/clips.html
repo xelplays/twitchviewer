@@ -736,7 +736,7 @@
         <!-- Controls Bar -->
         <div class="controls-bar">
             <div class="search-container">
-                <input type="text" id="searchInput" class="search-input" placeholder="Suche nach Clips, Autoren oder Beschreibungen...">
+                <input type="text" id="searchInput" class="search-input" placeholder="Suche nach Clips, Autoren oder Notizen...">
                 <select id="statusFilter" class="filter-select">
                     <option value="all">Alle Status</option>
                     <option value="pending">Nur Ausstehend</option>
@@ -897,23 +897,24 @@
                 const embedUrl = clipUrl.replace('clips.twitch.tv', 'clips.twitch.tv/embed').replace(/\/$/, '') + '?parent=einfachsven.xyz&autoplay=false';
                 
                 const submittedDate = new Date(clip.submitted_at * 1000).toLocaleDateString('de-DE');
-                const displayName = clip.display_name || clip.username || clip.submitter;
+                const displayName = clip.display_name || clip.submitter;
                 const isSelected = selectedClips.has(clip.id);
+                const clipTitle = clip.clip_id ? `Clip ${clip.clip_id}` : `Clip #${clip.id}`;
                 
                 return `
                     <div class="clip-card ${isSelected ? 'selected' : ''}" data-clip-id="${clip.id}">
                         <input type="checkbox" class="clip-checkbox" ${isSelected ? 'checked' : ''} 
                                onchange="toggleClipSelection(${clip.id})">
-                        <div class="clip-video" onclick="openVideoModal('${embedUrl}', '${clip.title}', '${displayName}')">
+                        <div class="clip-video" onclick="openVideoModal('${embedUrl}', '${clipTitle}', '${displayName}')">
                             <iframe src="${embedUrl}" allowfullscreen></iframe>
                             <div class="play-overlay">▶️</div>
                         </div>
                         <div class="clip-info">
                             <div class="clip-header">
-                                <div class="clip-title">${clip.title || 'Unbenannter Clip'}</div>
+                                <div class="clip-title">${clipTitle}</div>
                                 <div class="clip-status pending">Ausstehend</div>
                             </div>
-                            ${clip.description ? `<div class="clip-description">${clip.description}</div>` : ''}
+                            ${clip.note ? `<div class="clip-description">${clip.note}</div>` : ''}
                             <div class="clip-meta">
                                 <div class="clip-author">${displayName}</div>
                                 <div class="clip-date">${submittedDate}</div>
@@ -973,13 +974,14 @@
 
             const embedUrl = clip.clip_url.replace('clips.twitch.tv', 'clips.twitch.tv/embed').replace(/\/$/, '') + '?parent=einfachsven.xyz&autoplay=false';
             
+            const clipTitle = clip.clip_id ? `Clip ${clip.clip_id}` : `Clip #${clip.id}`;
             document.getElementById('approvalClipPreview').innerHTML = `
                 <div class="clip-video">
                     <iframe src="${embedUrl}" allowfullscreen></iframe>
                 </div>
                 <div style="margin-top: 15px;">
-                    <strong>${clip.title || 'Unbenannter Clip'}</strong><br>
-                    <small>von ${clip.display_name || clip.username || clip.submitter}</small>
+                    <strong>${clipTitle}</strong><br>
+                    <small>von ${clip.display_name || clip.submitter}</small>
                 </div>
             `;
             
@@ -995,13 +997,14 @@
 
             const embedUrl = clip.clip_url.replace('clips.twitch.tv', 'clips.twitch.tv/embed').replace(/\/$/, '') + '?parent=einfachsven.xyz&autoplay=false';
             
+            const clipTitle = clip.clip_id ? `Clip ${clip.clip_id}` : `Clip #${clip.id}`;
             document.getElementById('rejectionClipPreview').innerHTML = `
                 <div class="clip-video">
                     <iframe src="${embedUrl}" allowfullscreen></iframe>
                 </div>
                 <div style="margin-top: 15px;">
-                    <strong>${clip.title || 'Unbenannter Clip'}</strong><br>
-                    <small>von ${clip.display_name || clip.username || clip.submitter}</small>
+                    <strong>${clipTitle}</strong><br>
+                    <small>von ${clip.display_name || clip.submitter}</small>
                 </div>
             `;
             
@@ -1158,10 +1161,10 @@
 
             filteredClips = clips.filter(clip => {
                 const matchesSearch = !search || 
-                    clip.title?.toLowerCase().includes(search) ||
-                    clip.description?.toLowerCase().includes(search) ||
-                    clip.username?.toLowerCase().includes(search) ||
-                    clip.display_name?.toLowerCase().includes(search);
+                    clip.submitter?.toLowerCase().includes(search) ||
+                    clip.display_name?.toLowerCase().includes(search) ||
+                    clip.clip_id?.toLowerCase().includes(search) ||
+                    clip.note?.toLowerCase().includes(search);
                 
                 const matchesStatus = status === 'all' || clip.status === status;
                 
