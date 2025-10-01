@@ -3,144 +3,1247 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Twitch Activity Bot - Clip Dashboard</title>
-    <link rel="stylesheet" href="clips.css">
+    <title>Admin - Clip Management - einfachsven</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #9146ff 0%, #6441a5 100%);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 20px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #ffd700;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .refresh-btn {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4caf50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .stat-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ffd700;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .stat-card.pending .stat-icon { color: #ff9800; }
+        .stat-card.approved .stat-icon { color: #4caf50; }
+        .stat-card.rejected .stat-icon { color: #f44336; }
+
+        /* Filters and Controls */
+        .controls-bar {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .search-input::placeholder {
+            color: #666;
+        }
+
+        .filter-select {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .bulk-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .bulk-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .bulk-btn.approve {
+            background: linear-gradient(45deg, #4caf50, #45a049);
+            color: white;
+        }
+
+        .bulk-btn.reject {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            color: white;
+        }
+
+        .bulk-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .bulk-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Clips Grid */
+        .clips-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .clip-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .clip-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .clip-card.selected {
+            border: 2px solid #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+
+        .clip-checkbox {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            z-index: 10;
+            accent-color: #ffd700;
+        }
+
+        .clip-video {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #000;
+            cursor: pointer;
+        }
+
+        .clip-video iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .play-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .clip-card:hover .play-overlay {
+            background: rgba(255, 107, 107, 0.8);
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+
+        .clip-info {
+            padding: 20px;
+        }
+
+        .clip-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .clip-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #ffd700;
+            line-height: 1.4;
+            flex: 1;
+            margin-right: 15px;
+        }
+
+        .clip-status {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .clip-status.pending {
+            background: rgba(255, 152, 0, 0.2);
+            color: #ff9800;
+            border: 1px solid rgba(255, 152, 0, 0.3);
+        }
+
+        .clip-description {
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 15px;
+            line-height: 1.5;
+            max-height: 60px;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+        }
+
+        .clip-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 20px;
+        }
+
+        .clip-author {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .clip-author::before {
+            content: "👤";
+        }
+
+        .clip-date {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .clip-date::before {
+            content: "📅";
+        }
+
+        .clip-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .action-btn.approve {
+            background: linear-gradient(45deg, #4caf50, #45a049);
+            color: white;
+        }
+
+        .action-btn.reject {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            color: white;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Loading and Error States */
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            font-size: 18px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .error {
+            text-align: center;
+            padding: 40px 20px;
+            background: rgba(255, 0, 0, 0.2);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+            margin: 20px 0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: #ffd700;
+        }
+
+        .empty-state p {
+            opacity: 0.8;
+            font-size: 16px;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #9146ff 0%, #6441a5 100%);
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            color: #ffd700;
+            font-size: 1.5rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 0, 0, 0.3);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #4caf50, #45a049);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            border-left: 4px solid #4caf50;
+            z-index: 2000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.error {
+            border-left-color: #f44336;
+        }
+
+        .toast-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .clips-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .controls-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-container {
+                min-width: auto;
+                flex-direction: column;
+            }
+
+            .bulk-actions {
+                justify-content: center;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 15px;
+            }
+
+            .modal-content {
+                width: 95%;
+                padding: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px 15px;
+            }
+
+            .clip-actions {
+                flex-direction: column;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-card {
+                padding: 15px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <div class="header-content">
-                <h1><i class="fas fa-video"></i> Clip Dashboard</h1>
-                <div class="header-info">
-                    <span class="status-indicator" id="statusIndicator">
-                        <i class="fas fa-circle"></i> Connected
-                    </span>
-                    <button class="refresh-btn" id="refreshBtn">
-                        <i class="fas fa-sync-alt"></i> Refresh
-                    </button>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <a href="/" class="logo">
+                <i class="fas fa-video"></i>
+                Admin - Clip Management
+            </a>
+            <div class="header-actions">
+                <div class="status-indicator">
+                    <div class="status-dot"></div>
+                    <span>Verbunden</span>
                 </div>
-            </div>
-        </header>
-
-        <main class="main-content">
-            <div class="stats-bar">
-                <div class="stat-item">
-                    <i class="fas fa-clock"></i>
-                    <span class="stat-label">Pending</span>
-                    <span class="stat-value" id="pendingCount">0</span>
-                </div>
-                <div class="stat-item">
-                    <i class="fas fa-check-circle"></i>
-                    <span class="stat-label">Approved</span>
-                    <span class="stat-value" id="approvedCount">0</span>
-                </div>
-                <div class="stat-item">
-                    <i class="fas fa-times-circle"></i>
-                    <span class="stat-label">Rejected</span>
-                    <span class="stat-value" id="rejectedCount">0</span>
-                </div>
-            </div>
-
-            <div class="clips-section">
-                <div class="section-header">
-                    <h2>Pending Clip Submissions</h2>
-                    <div class="section-controls">
-                        <select id="sortSelect" class="sort-select">
-                            <option value="newest">Newest First</option>
-                            <option value="oldest">Oldest First</option>
-                            <option value="subscriber">Subscriber First</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="clips-container" id="clipsContainer">
-                    <div class="loading-state">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        <span>Loading clips...</span>
-                    </div>
-                </div>
-
-                <div class="no-clips" id="noClips" style="display: none;">
-                    <i class="fas fa-check-circle"></i>
-                    <h3>All caught up!</h3>
-                    <p>No pending clip submissions.</p>
-                </div>
-            </div>
-        </main>
-
-        <!-- Approval Modal -->
-        <div class="modal" id="approvalModal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3><i class="fas fa-check-circle"></i> Approve Clip</h3>
-                    <button class="modal-close" id="approvalModalClose">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="clip-preview" id="approvalClipPreview">
-                        <!-- Clip preview will be inserted here -->
-                    </div>
-                    <form id="approvalForm">
-                        <div class="form-group">
-                            <label for="approvalPoints">Points to Award:</label>
-                            <input type="number" id="approvalPoints" name="points" min="0" max="1000" value="10" required>
-                            <small>Points to give to the submitter</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="approvalNote">Note (optional):</label>
-                            <textarea id="approvalNote" name="note" rows="3" placeholder="Add a note about this clip..."></textarea>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="approvalCancel">Cancel</button>
-                    <button type="submit" form="approvalForm" class="btn btn-success">
-                        <i class="fas fa-check"></i> Approve & Award Points
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Rejection Modal -->
-        <div class="modal" id="rejectionModal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3><i class="fas fa-times-circle"></i> Reject Clip</h3>
-                    <button class="modal-close" id="rejectionModalClose">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="clip-preview" id="rejectionClipPreview">
-                        <!-- Clip preview will be inserted here -->
-                    </div>
-                    <form id="rejectionForm">
-                        <div class="form-group">
-                            <label for="rejectionNote">Reason for rejection:</label>
-                            <textarea id="rejectionNote" name="note" rows="3" placeholder="Why is this clip being rejected?" required></textarea>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="rejectionCancel">Cancel</button>
-                    <button type="submit" form="rejectionForm" class="btn btn-danger">
-                        <i class="fas fa-times"></i> Reject Clip
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Notification Toast -->
-        <div class="toast" id="toast">
-            <div class="toast-content">
-                <i class="toast-icon"></i>
-                <span class="toast-message"></span>
+                <button class="refresh-btn" id="refreshBtn">
+                    <i class="fas fa-sync-alt"></i>
+                    Aktualisieren
+                </button>
             </div>
         </div>
     </div>
 
-    <script src="clips.js"></script>
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Stats Bar -->
+        <div class="stats-bar">
+            <div class="stats-grid">
+                <div class="stat-card pending">
+                    <i class="fas fa-clock stat-icon"></i>
+                    <span class="stat-value" id="pendingCount">0</span>
+                    <span class="stat-label">Ausstehend</span>
+                </div>
+                <div class="stat-card approved">
+                    <i class="fas fa-check-circle stat-icon"></i>
+                    <span class="stat-value" id="approvedCount">0</span>
+                    <span class="stat-label">Genehmigt</span>
+                </div>
+                <div class="stat-card rejected">
+                    <i class="fas fa-times-circle stat-icon"></i>
+                    <span class="stat-value" id="rejectedCount">0</span>
+                    <span class="stat-label">Abgelehnt</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls Bar -->
+        <div class="controls-bar">
+            <div class="search-container">
+                <input type="text" id="searchInput" class="search-input" placeholder="Suche nach Clips, Autoren oder Beschreibungen...">
+                <select id="statusFilter" class="filter-select">
+                    <option value="all">Alle Status</option>
+                    <option value="pending">Nur Ausstehend</option>
+                    <option value="approved">Nur Genehmigt</option>
+                    <option value="rejected">Nur Abgelehnt</option>
+                </select>
+            </div>
+            <div class="bulk-actions">
+                <button class="bulk-btn approve" id="bulkApprove" disabled>
+                    <i class="fas fa-check"></i>
+                    Ausgewählte genehmigen
+                </button>
+                <button class="bulk-btn reject" id="bulkReject" disabled>
+                    <i class="fas fa-times"></i>
+                    Ausgewählte ablehnen
+                </button>
+            </div>
+        </div>
+
+        <!-- Clips Grid -->
+        <div class="clips-grid" id="clipsGrid">
+            <div class="loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <br><br>
+                Lade Clips...
+            </div>
+        </div>
+    </div>
+
+    <!-- Approval Modal -->
+    <div class="modal" id="approvalModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-check-circle"></i> Clip genehmigen</h3>
+                <button class="modal-close" id="approvalModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="clip-preview" id="approvalClipPreview">
+                    <!-- Clip preview will be inserted here -->
+                </div>
+                <form id="approvalForm">
+                    <div class="form-group">
+                        <label for="approvalPoints">Punkte vergeben:</label>
+                        <input type="number" id="approvalPoints" name="points" min="0" max="1000" value="10" required>
+                        <small style="color: rgba(255,255,255,0.7); font-size: 12px;">Punkte die dem Einsender vergeben werden</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="approvalNote">Notiz (optional):</label>
+                        <textarea id="approvalNote" name="note" rows="3" placeholder="Füge eine Notiz zu diesem Clip hinzu..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="approvalCancel">Abbrechen</button>
+                <button type="submit" form="approvalForm" class="btn btn-success">
+                    <i class="fas fa-check"></i> Genehmigen & Punkte vergeben
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rejection Modal -->
+    <div class="modal" id="rejectionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-times-circle"></i> Clip ablehnen</h3>
+                <button class="modal-close" id="rejectionModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="clip-preview" id="rejectionClipPreview">
+                    <!-- Clip preview will be inserted here -->
+                </div>
+                <form id="rejectionForm">
+                    <div class="form-group">
+                        <label for="rejectionNote">Grund für Ablehnung:</label>
+                        <textarea id="rejectionNote" name="note" rows="3" placeholder="Warum wird dieser Clip abgelehnt?" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="rejectionCancel">Abbrechen</button>
+                <button type="submit" form="rejectionForm" class="btn btn-danger">
+                    <i class="fas fa-times"></i> Clip ablehnen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <div class="toast-content">
+            <i class="toast-icon"></i>
+            <span class="toast-message"></span>
+        </div>
+    </div>
+
+    <script>
+        let clips = [];
+        let filteredClips = [];
+        let selectedClips = new Set();
+        let currentClipId = null;
+
+        // Get admin key from URL
+        function getAdminKey() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('admin_key');
+        }
+
+        // Load clips
+        async function loadClips() {
+            try {
+                const adminKey = getAdminKey();
+                if (!adminKey) {
+                    showError('Admin-Schlüssel fehlt in der URL');
+                    return;
+                }
+
+                const response = await fetch('/api/clips/pending', {
+                    headers: {
+                        'x-admin-key': adminKey
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                clips = await response.json();
+                filteredClips = [...clips];
+                displayClips();
+                updateStats();
+            } catch (error) {
+                console.error('Error loading clips:', error);
+                showError('Fehler beim Laden der Clips: ' + error.message);
+            }
+        }
+
+        // Display clips
+        function displayClips() {
+            const grid = document.getElementById('clipsGrid');
+            
+            if (filteredClips.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <h3><i class="fas fa-check-circle"></i> Alles erledigt!</h3>
+                        <p>Keine ausstehenden Clip-Einreichungen.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = filteredClips.map(clip => {
+                const clipUrl = clip.clip_url;
+                const embedUrl = clipUrl.replace('clips.twitch.tv', 'clips.twitch.tv/embed').replace(/\/$/, '') + '?parent=einfachsven.xyz&autoplay=false';
+                
+                const submittedDate = new Date(clip.submitted_at * 1000).toLocaleDateString('de-DE');
+                const displayName = clip.display_name || clip.username;
+                const isSelected = selectedClips.has(clip.id);
+                
+                return `
+                    <div class="clip-card ${isSelected ? 'selected' : ''}" data-clip-id="${clip.id}">
+                        <input type="checkbox" class="clip-checkbox" ${isSelected ? 'checked' : ''} 
+                               onchange="toggleClipSelection(${clip.id})">
+                        <div class="clip-video" onclick="openVideoModal('${embedUrl}', '${clip.title}', '${displayName}')">
+                            <iframe src="${embedUrl}" allowfullscreen></iframe>
+                            <div class="play-overlay">▶️</div>
+                        </div>
+                        <div class="clip-info">
+                            <div class="clip-header">
+                                <div class="clip-title">${clip.title || 'Unbenannter Clip'}</div>
+                                <div class="clip-status pending">Ausstehend</div>
+                            </div>
+                            ${clip.description ? `<div class="clip-description">${clip.description}</div>` : ''}
+                            <div class="clip-meta">
+                                <div class="clip-author">${displayName}</div>
+                                <div class="clip-date">${submittedDate}</div>
+                            </div>
+                            <div class="clip-actions">
+                                <button class="action-btn approve" onclick="openApprovalModal(${clip.id})">
+                                    <i class="fas fa-check"></i> Genehmigen
+                                </button>
+                                <button class="action-btn reject" onclick="openRejectionModal(${clip.id})">
+                                    <i class="fas fa-times"></i> Ablehnen
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            grid.innerHTML = html;
+        }
+
+        // Update stats
+        function updateStats() {
+            const pendingCount = clips.filter(c => c.status === 'pending').length;
+            const approvedCount = clips.filter(c => c.status === 'approved').length;
+            const rejectedCount = clips.filter(c => c.status === 'rejected').length;
+
+            document.getElementById('pendingCount').textContent = pendingCount;
+            document.getElementById('approvedCount').textContent = approvedCount;
+            document.getElementById('rejectedCount').textContent = rejectedCount;
+        }
+
+        // Toggle clip selection
+        function toggleClipSelection(clipId) {
+            if (selectedClips.has(clipId)) {
+                selectedClips.delete(clipId);
+            } else {
+                selectedClips.add(clipId);
+            }
+            
+            updateBulkActions();
+            displayClips(); // Re-render to update selected state
+        }
+
+        // Update bulk action buttons
+        function updateBulkActions() {
+            const hasSelection = selectedClips.size > 0;
+            document.getElementById('bulkApprove').disabled = !hasSelection;
+            document.getElementById('bulkReject').disabled = !hasSelection;
+        }
+
+        // Open approval modal
+        function openApprovalModal(clipId) {
+            currentClipId = clipId;
+            const clip = clips.find(c => c.id === clipId);
+            
+            if (!clip) return;
+
+            const embedUrl = clip.clip_url.replace('clips.twitch.tv', 'clips.twitch.tv/embed').replace(/\/$/, '') + '?parent=einfachsven.xyz&autoplay=false';
+            
+            document.getElementById('approvalClipPreview').innerHTML = `
+                <div class="clip-video">
+                    <iframe src="${embedUrl}" allowfullscreen></iframe>
+                </div>
+                <div style="margin-top: 15px;">
+                    <strong>${clip.title || 'Unbenannter Clip'}</strong><br>
+                    <small>von ${clip.display_name || clip.username}</small>
+                </div>
+            `;
+            
+            document.getElementById('approvalModal').classList.add('show');
+        }
+
+        // Open rejection modal
+        function openRejectionModal(clipId) {
+            currentClipId = clipId;
+            const clip = clips.find(c => c.id === clipId);
+            
+            if (!clip) return;
+
+            const embedUrl = clip.clip_url.replace('clips.twitch.tv', 'clips.twitch.tv/embed').replace(/\/$/, '') + '?parent=einfachsven.xyz&autoplay=false';
+            
+            document.getElementById('rejectionClipPreview').innerHTML = `
+                <div class="clip-video">
+                    <iframe src="${embedUrl}" allowfullscreen></iframe>
+                </div>
+                <div style="margin-top: 15px;">
+                    <strong>${clip.title || 'Unbenannter Clip'}</strong><br>
+                    <small>von ${clip.display_name || clip.username}</small>
+                </div>
+            `;
+            
+            document.getElementById('rejectionModal').classList.add('show');
+        }
+
+        // Open video modal for full-screen viewing
+        function openVideoModal(embedUrl, title, author) {
+            // Create a simple video modal
+            const modal = document.createElement('div');
+            modal.className = 'modal show';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>${title}</h3>
+                        <button class="modal-close" onclick="this.closest('.modal').remove()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="clip-video" style="height: 400px;">
+                            <iframe src="${embedUrl}&autoplay=true" allowfullscreen></iframe>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Close on background click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
+        }
+
+        // Approve clip
+        async function approveClip(points, note) {
+            try {
+                const adminKey = getAdminKey();
+                const response = await fetch(`/api/clips/${currentClipId}/approve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-admin-key': adminKey
+                    },
+                    body: JSON.stringify({ points, note })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                showToast('Clip erfolgreich genehmigt!', 'success');
+                document.getElementById('approvalModal').classList.remove('show');
+                loadClips(); // Reload clips
+            } catch (error) {
+                console.error('Error approving clip:', error);
+                showToast('Fehler beim Genehmigen: ' + error.message, 'error');
+            }
+        }
+
+        // Reject clip
+        async function rejectClip(note) {
+            try {
+                const adminKey = getAdminKey();
+                const response = await fetch(`/api/clips/${currentClipId}/reject`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-admin-key': adminKey
+                    },
+                    body: JSON.stringify({ note })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                showToast('Clip erfolgreich abgelehnt!', 'success');
+                document.getElementById('rejectionModal').classList.remove('show');
+                loadClips(); // Reload clips
+            } catch (error) {
+                console.error('Error rejecting clip:', error);
+                showToast('Fehler beim Ablehnen: ' + error.message, 'error');
+            }
+        }
+
+        // Bulk approve
+        async function bulkApprove() {
+            if (selectedClips.size === 0) return;
+
+            const points = prompt('Punkte für alle ausgewählten Clips:', '10');
+            if (points === null || isNaN(points) || points < 0) return;
+
+            try {
+                const adminKey = getAdminKey();
+                const promises = Array.from(selectedClips).map(clipId => 
+                    fetch(`/api/clips/${clipId}/approve`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-admin-key': adminKey
+                        },
+                        body: JSON.stringify({ points: parseInt(points), note: 'Bulk genehmigt' })
+                    })
+                );
+
+                await Promise.all(promises);
+                showToast(`${selectedClips.size} Clips erfolgreich genehmigt!`, 'success');
+                selectedClips.clear();
+                loadClips();
+            } catch (error) {
+                console.error('Error bulk approving clips:', error);
+                showToast('Fehler beim Bulk-Genehmigen: ' + error.message, 'error');
+            }
+        }
+
+        // Bulk reject
+        async function bulkReject() {
+            if (selectedClips.size === 0) return;
+
+            const note = prompt('Grund für Ablehnung aller ausgewählten Clips:', 'Bulk abgelehnt');
+            if (note === null) return;
+
+            try {
+                const adminKey = getAdminKey();
+                const promises = Array.from(selectedClips).map(clipId => 
+                    fetch(`/api/clips/${clipId}/reject`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-admin-key': adminKey
+                        },
+                        body: JSON.stringify({ note })
+                    })
+                );
+
+                await Promise.all(promises);
+                showToast(`${selectedClips.size} Clips erfolgreich abgelehnt!`, 'success');
+                selectedClips.clear();
+                loadClips();
+            } catch (error) {
+                console.error('Error bulk rejecting clips:', error);
+                showToast('Fehler beim Bulk-Ablehnen: ' + error.message, 'error');
+            }
+        }
+
+        // Filter clips
+        function filterClips() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const status = document.getElementById('statusFilter').value;
+
+            filteredClips = clips.filter(clip => {
+                const matchesSearch = !search || 
+                    clip.title?.toLowerCase().includes(search) ||
+                    clip.description?.toLowerCase().includes(search) ||
+                    clip.username?.toLowerCase().includes(search) ||
+                    clip.display_name?.toLowerCase().includes(search);
+                
+                const matchesStatus = status === 'all' || clip.status === status;
+                
+                return matchesSearch && matchesStatus;
+            });
+
+            displayClips();
+        }
+
+        // Show error
+        function showError(message) {
+            const grid = document.getElementById('clipsGrid');
+            grid.innerHTML = `
+                <div class="error">
+                    ❌ ${message}<br>
+                    <small>Versuche es später erneut</small>
+                </div>
+            `;
+        }
+
+        // Show toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
+            
+            toast.innerHTML = `
+                <div class="toast-content">
+                    <i class="${icon}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            toast.className = `toast ${type} show`;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Event listeners
+        document.getElementById('refreshBtn').addEventListener('click', loadClips);
+        document.getElementById('searchInput').addEventListener('input', filterClips);
+        document.getElementById('statusFilter').addEventListener('change', filterClips);
+        document.getElementById('bulkApprove').addEventListener('click', bulkApprove);
+        document.getElementById('bulkReject').addEventListener('click', bulkReject);
+
+        // Modal event listeners
+        document.getElementById('approvalModalClose').addEventListener('click', () => {
+            document.getElementById('approvalModal').classList.remove('show');
+        });
+        document.getElementById('approvalCancel').addEventListener('click', () => {
+            document.getElementById('approvalModal').classList.remove('show');
+        });
+        document.getElementById('approvalForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const points = parseInt(document.getElementById('approvalPoints').value);
+            const note = document.getElementById('approvalNote').value;
+            approveClip(points, note);
+        });
+
+        document.getElementById('rejectionModalClose').addEventListener('click', () => {
+            document.getElementById('rejectionModal').classList.remove('show');
+        });
+        document.getElementById('rejectionCancel').addEventListener('click', () => {
+            document.getElementById('rejectionModal').classList.remove('show');
+        });
+        document.getElementById('rejectionForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const note = document.getElementById('rejectionNote').value;
+            rejectClip(note);
+        });
+
+        // Close modals on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.getElementById('approvalModal').classList.remove('show');
+                document.getElementById('rejectionModal').classList.remove('show');
+            }
+        });
+
+        // Initial load
+        loadClips();
+    </script>
 </body>
 </html>
