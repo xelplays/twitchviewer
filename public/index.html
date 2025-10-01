@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>einfachsven - Twitch Stream</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #9146ff 0%, #6441a5 100%);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 350px 1fr 300px;
+            grid-template-rows: auto 1fr auto;
+            min-height: 100vh;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            background: #4caf50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Left Sidebar - Leaderboard */
+        .leaderboard-sidebar {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+
+        .leaderboard-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #ffd700;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .leaderboard-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(5px);
+        }
+
+        .leaderboard-item.rank-1 {
+            border-left-color: #ffd700;
+            background: rgba(255, 215, 0, 0.2);
+        }
+
+        .leaderboard-item.rank-2 {
+            border-left-color: #c0c0c0;
+            background: rgba(192, 192, 192, 0.2);
+        }
+
+        .leaderboard-item.rank-3 {
+            border-left-color: #cd7f32;
+            background: rgba(205, 127, 50, 0.2);
+        }
+
+        .rank {
+            font-weight: bold;
+            font-size: 18px;
+            min-width: 30px;
+        }
+
+        .rank.rank-1::before { content: "🥇"; }
+        .rank.rank-2::before { content: "🥈"; }
+        .rank.rank-3::before { content: "🥉"; }
+
+        .username {
+            flex: 1;
+            margin-left: 15px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .points {
+            font-weight: bold;
+            color: #ffd700;
+            font-size: 16px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 16px;
+            opacity: 0.8;
+        }
+
+        .error {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255, 0, 0, 0.2);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+        }
+
+        /* Center - Stream */
+        .stream-container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 600px;
+        }
+
+        .stream-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #ffd700;
+        }
+
+        .stream-embed {
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 16/9;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+        }
+
+        .stream-embed iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .stream-info {
+            text-align: center;
+            max-width: 600px;
+        }
+
+        .stream-info h3 {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: #ff6b6b;
+        }
+
+        .stream-info p {
+            font-size: 1rem;
+            opacity: 0.9;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .stream-commands {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .command-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Right Sidebar - Dashboard */
+        .dashboard-sidebar {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .dashboard-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #ffd700;
+        }
+
+        .dashboard-button {
+            display: block;
+            width: 100%;
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            color: white;
+            text-decoration: none;
+            padding: 20px;
+            border-radius: 15px;
+            font-weight: bold;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+        }
+
+        .dashboard-button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .dashboard-info {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .dashboard-info h4 {
+            color: #ffd700;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .dashboard-info ul {
+            list-style: none;
+            text-align: left;
+        }
+
+        .dashboard-info li {
+            padding: 5px 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .dashboard-info li::before {
+            content: "✓";
+            color: #4caf50;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffd700;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        /* Footer */
+        .footer {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-top: 20px;
+        }
+
+        .footer p {
+            opacity: 0.8;
+            font-size: 14px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 300px 1fr 250px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto auto auto;
+            }
+            
+            .leaderboard-sidebar,
+            .dashboard-sidebar {
+                position: static;
+            }
+            
+            .stream-container {
+                min-height: 400px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+                gap: 15px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .stream-embed {
+                aspect-ratio: 16/9;
+            }
+            
+            .stream-commands {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Refresh indicator */
+        .refresh-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(76, 175, 80, 0.9);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 25px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .refresh-indicator.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎮 einfachsven</h1>
+            <p>
+                <span class="status-indicator"></span>
+                Live Stream mit interaktivem Leaderboard
+            </p>
+        </div>
+
+        <!-- Left Sidebar - Leaderboard -->
+        <div class="leaderboard-sidebar">
+            <div class="leaderboard-title">🏆 Leaderboard</div>
+            <div class="leaderboard" id="leaderboard">
+                <div class="loading">🔄 Lade Leaderboard...</div>
+            </div>
+        </div>
+
+        <!-- Center - Stream -->
+        <div class="stream-container">
+            <div class="stream-title">📺 Live Stream</div>
+            
+            <div class="stream-embed">
+                <iframe 
+                    src="https://player.twitch.tv/?channel=einfachsven&parent=einfachsven.xyz&autoplay=true&muted=false"
+                    allowfullscreen>
+                </iframe>
+            </div>
+            
+            <div class="stream-info">
+                <h3>🎯 Sammle Punkte durch aktive Teilnahme!</h3>
+                <p>Chatte mit, schaue den Stream und reiche Clips ein, um Punkte zu sammeln und im Leaderboard zu steigen!</p>
+                
+                <div class="stream-commands">
+                    <div class="command-item">!points - Deine Punkte</div>
+                    <div class="command-item">!leaderboard - Top 5</div>
+                    <div class="command-item">!submitclip - Clip einreichen</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar - Dashboard -->
+        <div class="dashboard-sidebar">
+            <div class="dashboard-title">📊 Dashboard</div>
+            
+            <a href="/dashboard" class="dashboard-button">
+                🚀 Dashboard öffnen
+            </a>
+            
+            <div class="dashboard-info">
+                <h4>🎯 Punkte sammeln:</h4>
+                <ul>
+                    <li>Chat-Nachrichten schreiben</li>
+                    <li>Stream schauen (Viewtime)</li>
+                    <li>Clips einreichen</li>
+                    <li>An Challenges teilnehmen</li>
+                </ul>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="totalUsers">-</div>
+                    <div class="stat-label">Aktive User</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="totalPoints">-</div>
+                    <div class="stat-label">Gesamt Punkte</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>🎮 Einfachsven Stream • Interaktives Leaderboard • Sammle Punkte und steige auf!</p>
+        </div>
+    </div>
+
+    <div class="refresh-indicator" id="refreshIndicator">
+        🔄 Leaderboard aktualisiert
+    </div>
+
+    <script>
+        let refreshInterval;
+
+        // Load leaderboard
+        async function loadLeaderboard() {
+            try {
+                const response = await fetch('/api/leaderboard');
+                const data = await response.json();
+                
+                if (data.top && Array.isArray(data.top)) {
+                    displayLeaderboard(data.top.slice(0, 10));
+                    updateStats(data.top);
+                    showRefreshIndicator();
+                } else {
+                    throw new Error('Invalid response format');
+                }
+            } catch (error) {
+                console.error('Error loading leaderboard:', error);
+                showError();
+            }
+        }
+
+        // Display leaderboard
+        function displayLeaderboard(leaderboard) {
+            const container = document.getElementById('leaderboard');
+            
+            if (leaderboard.length === 0) {
+                container.innerHTML = '<div class="error">❌ Keine Daten verfügbar</div>';
+                return;
+            }
+
+            const html = leaderboard.map((user, index) => {
+                const rank = index + 1;
+                const rankClass = rank <= 3 ? `rank-${rank}` : '';
+                
+                return `
+                    <div class="leaderboard-item ${rankClass}">
+                        <div class="rank rank-${rank}">${rank}</div>
+                        <div class="username">${user.display_name || user.username}</div>
+                        <div class="points">${user.points.toLocaleString()}</div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = html;
+        }
+
+        // Update stats
+        function updateStats(leaderboard) {
+            const totalUsers = leaderboard.length;
+            const totalPoints = leaderboard.reduce((sum, user) => sum + user.points, 0);
+            
+            document.getElementById('totalUsers').textContent = totalUsers;
+            document.getElementById('totalPoints').textContent = totalPoints.toLocaleString();
+        }
+
+        // Show error
+        function showError() {
+            const container = document.getElementById('leaderboard');
+            container.innerHTML = `
+                <div class="error">
+                    ❌ Fehler beim Laden<br>
+                    <small>Versuche es später erneut</small>
+                </div>
+            `;
+        }
+
+        // Show refresh indicator
+        function showRefreshIndicator() {
+            const indicator = document.getElementById('refreshIndicator');
+            indicator.classList.add('show');
+            setTimeout(() => {
+                indicator.classList.remove('show');
+            }, 2000);
+        }
+
+        // Initial load
+        loadLeaderboard();
+
+        // Auto-refresh every 30 seconds
+        refreshInterval = setInterval(loadLeaderboard, 30000);
+
+        // Handle visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                loadLeaderboard();
+            }
+        });
+
+        // Cleanup on unload
+        window.addEventListener('beforeunload', () => {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+    </script>
+</body>
+</html>

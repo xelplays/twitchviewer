@@ -107,6 +107,7 @@ app.use('/admin', express.static(path.join(__dirname, 'admin_static')));
 app.use('/dashboard', express.static(path.join(__dirname, 'dashboard_static')));
 app.use('/twitch_panel', express.static(path.join(__dirname, 'twitch_panel')));
 app.use('/twitch_extension', express.static(path.join(__dirname, 'twitch_extension')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Session configuration
 app.use(session({
