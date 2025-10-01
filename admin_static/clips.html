@@ -897,7 +897,7 @@
                 const embedUrl = clipUrl.replace('clips.twitch.tv', 'clips.twitch.tv/embed').replace(/\/$/, '') + '?parent=einfachsven.xyz&autoplay=false';
                 
                 const submittedDate = new Date(clip.submitted_at * 1000).toLocaleDateString('de-DE');
-                const displayName = clip.display_name || clip.username;
+                const displayName = clip.display_name || clip.username || clip.submitter;
                 const isSelected = selectedClips.has(clip.id);
                 
                 return `
@@ -979,7 +979,7 @@
                 </div>
                 <div style="margin-top: 15px;">
                     <strong>${clip.title || 'Unbenannter Clip'}</strong><br>
-                    <small>von ${clip.display_name || clip.username}</small>
+                    <small>von ${clip.display_name || clip.username || clip.submitter}</small>
                 </div>
             `;
             
@@ -1001,7 +1001,7 @@
                 </div>
                 <div style="margin-top: 15px;">
                     <strong>${clip.title || 'Unbenannter Clip'}</strong><br>
-                    <small>von ${clip.display_name || clip.username}</small>
+                    <small>von ${clip.display_name || clip.username || clip.submitter}</small>
                 </div>
             `;
             
