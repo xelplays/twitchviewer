@@ -585,8 +585,10 @@
 
             const html = clips.map(clip => {
                 const clipUrl = clip.clip_url;
-                const embedUrl = clipUrl.replace('clips.twitch.tv', 'clips.twitch.tv/embed').replace(/\/$/, '') + '?parent=einfachsven.xyz&autoplay=false';
-                const thumbnailUrl = clipUrl.replace('clips.twitch.tv', 'clips-media-assets2.twitch.tv').replace(/\/$/, '') + '-preview-480x272.jpg';
+                // Extract clip ID from URL
+                const clipId = clipUrl.split('/').pop().split('?')[0];
+                const embedUrl = `https://clips.twitch.tv/embed?clip=${clipId}&parent=einfachsven.xyz&autoplay=false`;
+                const thumbnailUrl = `https://clips-media-assets2.twitch.tv/${clipId}-preview-480x272.jpg`;
                 
                 const submittedDate = new Date(clip.submitted_at * 1000).toLocaleDateString('de-DE');
                 const displayName = clip.display_name || clip.username;
@@ -673,7 +675,7 @@
             const modalVideo = document.getElementById('modalVideo');
             
             modalVideo.innerHTML = `
-                <iframe src="${embedUrl}&autoplay=true" allowfullscreen></iframe>
+                <iframe src="${embedUrl.replace('autoplay=false', 'autoplay=true')}" allowfullscreen></iframe>
             `;
             
             modal.classList.add('show');

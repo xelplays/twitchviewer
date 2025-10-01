@@ -894,7 +894,9 @@
 
             const html = filteredClips.map(clip => {
                 const clipUrl = clip.clip_url;
-                const embedUrl = clipUrl.replace('clips.twitch.tv', 'clips.twitch.tv/embed').replace(/\/$/, '') + '?parent=einfachsven.xyz&autoplay=false';
+                // Extract clip ID from URL (e.g., https://clips.twitch.tv/AdventurousSarcasticSalamanderSoonerLater -> AdventurousSarcasticSalamanderSoonerLater)
+                const clipId = clipUrl.split('/').pop().split('?')[0];
+                const embedUrl = `https://clips.twitch.tv/embed?clip=${clipId}&parent=einfachsven.xyz&autoplay=false`;
                 
                 const submittedDate = new Date(clip.submitted_at * 1000).toLocaleDateString('de-DE');
                 const displayName = clip.display_name || clip.submitter;
@@ -972,7 +974,8 @@
             
             if (!clip) return;
 
-            const embedUrl = clip.clip_url.replace('clips.twitch.tv', 'clips.twitch.tv/embed').replace(/\/$/, '') + '?parent=einfachsven.xyz&autoplay=false';
+            const clipId = clip.clip_url.split('/').pop().split('?')[0];
+            const embedUrl = `https://clips.twitch.tv/embed?clip=${clipId}&parent=einfachsven.xyz&autoplay=false`;
             
             const clipTitle = clip.clip_id ? `Clip ${clip.clip_id}` : `Clip #${clip.id}`;
             document.getElementById('approvalClipPreview').innerHTML = `
@@ -995,7 +998,8 @@
             
             if (!clip) return;
 
-            const embedUrl = clip.clip_url.replace('clips.twitch.tv', 'clips.twitch.tv/embed').replace(/\/$/, '') + '?parent=einfachsven.xyz&autoplay=false';
+            const clipId = clip.clip_url.split('/').pop().split('?')[0];
+            const embedUrl = `https://clips.twitch.tv/embed?clip=${clipId}&parent=einfachsven.xyz&autoplay=false`;
             
             const clipTitle = clip.clip_id ? `Clip ${clip.clip_id}` : `Clip #${clip.id}`;
             document.getElementById('rejectionClipPreview').innerHTML = `
@@ -1026,7 +1030,7 @@
                     </div>
                     <div class="modal-body">
                         <div class="clip-video" style="height: 400px;">
-                            <iframe src="${embedUrl}&autoplay=true" allowfullscreen></iframe>
+                            <iframe src="${embedUrl.replace('autoplay=false', 'autoplay=true')}" allowfullscreen></iframe>
                         </div>
                     </div>
                 </div>
