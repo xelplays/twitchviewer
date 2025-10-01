@@ -275,16 +275,15 @@ app.get('/api/clips/public', async (req, res) => {
     const { limit = 20, offset = 0, search } = req.query;
     
     let query = `
-      SELECT c.*, u.display_name, u.username
+      SELECT c.*, c.display_name, c.submitter as username
       FROM clips c
-      LEFT JOIN users u ON c.username = u.username
       WHERE c.status = 'approved'
     `;
     
     const params = [];
     
     if (search) {
-      query += ` AND (c.title LIKE ? OR c.description LIKE ? OR c.username LIKE ?)`;
+      query += ` AND (c.submitter LIKE ? OR c.display_name LIKE ? OR c.note LIKE ?)`;
       const searchTerm = `%${search}%`;
       params.push(searchTerm, searchTerm, searchTerm);
     }
@@ -299,7 +298,7 @@ app.get('/api/clips/public', async (req, res) => {
     const countParams = [];
     
     if (search) {
-      countQuery += ` AND (title LIKE ? OR description LIKE ? OR username LIKE ?)`;
+      countQuery += ` AND (submitter LIKE ? OR display_name LIKE ? OR note LIKE ?)`;
       const searchTerm = `%${search}%`;
       countParams.push(searchTerm, searchTerm, searchTerm);
     }

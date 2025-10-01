@@ -182,27 +182,6 @@
             border: none;
         }
 
-        .play-overlay {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.7);
-            border-radius: 50%;
-            width: 80px;
-            height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 30px;
-            transition: all 0.3s ease;
-            pointer-events: none;
-        }
-
-        .clip-card:hover .play-overlay {
-            background: rgba(255, 107, 107, 0.8);
-            transform: translate(-50%, -50%) scale(1.1);
-        }
 
         .clip-info {
             padding: 20px;
@@ -592,16 +571,16 @@
                 
                 const submittedDate = new Date(clip.submitted_at * 1000).toLocaleDateString('de-DE');
                 const displayName = clip.display_name || clip.username;
+                const clipTitle = clip.clip_id ? `Clip ${clip.clip_id}` : `Clip #${clip.id}`;
                 
                 return `
-                    <div class="clip-card" onclick="openVideoModal('${embedUrl}', '${clip.title}', '${displayName}')">
+                    <div class="clip-card" onclick="openVideoModal('${embedUrl}', '${clipTitle}', '${displayName}')">
                         <div class="clip-video">
                             <iframe src="${embedUrl}" allowfullscreen></iframe>
-                            <div class="play-overlay">▶️</div>
                         </div>
                         <div class="clip-info">
-                            <div class="clip-title">${clip.title || 'Unbenannter Clip'}</div>
-                            ${clip.description ? `<div class="clip-description">${clip.description}</div>` : ''}
+                            <div class="clip-title">${clipTitle}</div>
+                            ${clip.note ? `<div class="clip-description">${clip.note}</div>` : ''}
                             <div class="clip-meta">
                                 <div class="clip-author">${displayName}</div>
                                 <div class="clip-date">${submittedDate}</div>
