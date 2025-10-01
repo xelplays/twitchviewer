@@ -974,8 +974,8 @@
             
             if (!clip) return;
 
-            const clipId = clip.clip_url.split('/').pop().split('?')[0];
-            const embedUrl = `https://clips.twitch.tv/embed?clip=${clipId}&parent=einfachsven.xyz&autoplay=false`;
+            const clipSlug = clip.clip_url.split('/').pop().split('?')[0];
+            const embedUrl = `https://clips.twitch.tv/embed?clip=${clipSlug}&parent=einfachsven.xyz&autoplay=false`;
             
             const clipTitle = clip.clip_id ? `Clip ${clip.clip_id}` : `Clip #${clip.id}`;
             document.getElementById('approvalClipPreview').innerHTML = `
@@ -998,8 +998,8 @@
             
             if (!clip) return;
 
-            const clipId = clip.clip_url.split('/').pop().split('?')[0];
-            const embedUrl = `https://clips.twitch.tv/embed?clip=${clipId}&parent=einfachsven.xyz&autoplay=false`;
+            const clipSlug = clip.clip_url.split('/').pop().split('?')[0];
+            const embedUrl = `https://clips.twitch.tv/embed?clip=${clipSlug}&parent=einfachsven.xyz&autoplay=false`;
             
             const clipTitle = clip.clip_id ? `Clip ${clip.clip_id}` : `Clip #${clip.id}`;
             document.getElementById('rejectionClipPreview').innerHTML = `
