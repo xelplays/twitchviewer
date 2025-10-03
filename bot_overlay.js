@@ -237,7 +237,7 @@ function isUserBot(username) {
 // Anti-Spam Configuration
 const SPAM_CONFIG = {
   MIN_MESSAGE_LENGTH: 3,           // Minimum message length for points
-  CHAT_POINTS_COOLDOWN: 10,        // Seconds between chat points
+  CHAT_POINTS_COOLDOWN: 30,        // Seconds between chat points
   MAX_MESSAGES_PER_MINUTE: 6,      // Max messages per minute to avoid spam
   MAX_CHAT_POINTS_PER_HOUR: 60,    // Max chat points per hour
   SPAM_DETECTION_WINDOW: 60        // Seconds to track for spam detection
