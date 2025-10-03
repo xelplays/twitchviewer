@@ -360,9 +360,38 @@ app.get('/top10', async (req, res) => {
 app.get('/api/admin/bots', authenticateAdmin, async (req, res) => {
   try {
     const bots = await db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC');
+    console.log('🔍 API /api/admin/bots - Found bots:', bots);
+    console.log('🔍 API /api/admin/bots - Bots count:', bots.length);
     res.json(bots);
   } catch (error) {
     console.error('Error fetching bots:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Debug endpoint to check database directly
+app.get('/api/admin/bots/debug', authenticateAdmin, async (req, res) => {
+  try {
+    const allBots = await db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC');
+    const emptyBots = await db.all('SELECT * FROM bot_blacklist WHERE username IS NULL OR username = "" OR TRIM(username) = ""');
+    const validBots = await db.all('SELECT * FROM bot_blacklist WHERE username IS NOT NULL AND username != "" AND TRIM(username) != ""');
+    
+    console.log('🔍 Debug - All bots:', allBots);
+    console.log('🔍 Debug - Empty bots:', emptyBots);
+    console.log('🔍 Debug - Valid bots:', validBots);
+    
+    res.json({
+      allBots: allBots,
+      emptyBots: emptyBots,
+      validBots: validBots,
+      counts: {
+        total: allBots.length,
+        empty: emptyBots.length,
+        valid: validBots.length
+      }
+    });
+  } catch (error) {
+    console.error('Error in debug endpoint:', error);
     res.status(500).json({ error: 'Database error' });
   }
 });
