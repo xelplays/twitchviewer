@@ -32,6 +32,7 @@ const config = {
   twitchClientId: process.env.TWITCH_CLIENT_ID,
   twitchClientSecret: process.env.TWITCH_CLIENT_SECRET,
   twitchBotClientId: process.env.TWITCH_BOT_CLIENT_ID || process.env.TWITCH_CLIENT_ID,
+  twitchBotAccessToken: process.env.TWITCH_BOT_APP_ACCESS_TOKEN, // Use same token for stream checking
   twitchBotAppAccessToken: process.env.TWITCH_BOT_APP_ACCESS_TOKEN,
   twitchBotAppClientId: process.env.TWITCH_BOT_APP_CLIENT_ID || process.env.TWITCH_BOT_CLIENT_ID || process.env.TWITCH_CLIENT_ID,
   enableEventSub: process.env.ENABLE_EVENTSUB === 'true',
@@ -137,6 +138,11 @@ function authenticateAdmin(req, res, next) {
 // Helper function to check if stream is live
 async function isStreamLive() {
   try {
+    if (!config.twitchBotAccessToken || !config.twitchBotClientId) {
+      console.log('⚠️ Stream check disabled - missing Twitch API credentials');
+      return true; // Allow chat points when API is not configured
+    }
+    
     const response = await fetch(`https://api.twitch.tv/helix/streams?user_login=${config.channel}`, {
       headers: {
         'Client-ID': config.twitchBotClientId,
@@ -145,15 +151,21 @@ async function isStreamLive() {
     });
     
     if (!response.ok) {
-      console.error('Error checking stream status:', response.status);
-      return false;
+      if (response.status === 401) {
+        console.error('❌ Stream check failed - Invalid Twitch API token (401 Unauthorized)');
+      } else {
+        console.error(`❌ Stream check failed - HTTP ${response.status}`);
+      }
+      return true; // Allow chat points on API errors to avoid blocking users
     }
     
     const data = await response.json();
-    return data.data && data.data.length > 0;
+    const isLive = data.data && data.data.length > 0;
+    console.log(`📺 Stream status: ${isLive ? 'LIVE' : 'OFFLINE'}`);
+    return isLive;
   } catch (error) {
     console.error('Error checking stream status:', error);
-    return false;
+    return true; // Allow chat points on errors to avoid blocking users
   }
 }
 
