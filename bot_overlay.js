@@ -345,37 +345,81 @@ app.get('/top10', async (req, res) => {
 });
 
 // Bot Management API endpoints
-app.get('/api/admin/bots', authenticateAdmin, async (req, res) => {
-  try {
-    const bots = await db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC');
-    console.log('🔍 API /api/admin/bots - Found bots:', bots);
+app.get('/api/admin/bots', authenticateAdmin, (req, res) => {
+  console.log('🔍 API /api/admin/bots called');
+  
+  db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC', (err, rows) => {
+    if (err) {
+      console.error('Error fetching bots:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    console.log('🔍 API /api/admin/bots - Found bots:', rows);
+    console.log('🔍 API /api/admin/bots - Bots count:', rows ? rows.length : 0);
+    
+    // Ensure we always return an array
+    const bots = Array.isArray(rows) ? rows : [];
     res.json(bots);
-  } catch (error) {
-    console.error('Error fetching bots:', error);
-    res.status(500).json({ error: 'Database error' });
-  }
+  });
 });
 
 // Debug endpoint to check specific user
-app.get('/api/admin/bots/debug/:username', authenticateAdmin, async (req, res) => {
-  try {
-    const username = req.params.username.toLowerCase();
-    const bot = await db.get('SELECT * FROM bot_blacklist WHERE username = ?', [username]);
-    const allBots = await db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC');
+app.get('/api/admin/bots/debug/:username', authenticateAdmin, (req, res) => {
+  const username = req.params.username.toLowerCase();
+  console.log(`🔍 Debug endpoint called for: ${username}`);
+  
+  db.get('SELECT * FROM bot_blacklist WHERE username = ?', [username], (err, bot) => {
+    if (err) {
+      console.error('Error in debug endpoint:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
     
-    console.log(`🔍 Debug check for ${username}:`, bot ? 'FOUND' : 'NOT FOUND');
-    console.log('🔍 All bots in database:', allBots);
-    
-    res.json({
-      username: username,
-      found: !!bot,
-      botData: bot,
-      allBots: allBots
+    db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC', (err, allBots) => {
+      if (err) {
+        console.error('Error fetching all bots:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+      
+      console.log(`🔍 Debug check for ${username}:`, bot ? 'FOUND' : 'NOT FOUND');
+      console.log('🔍 All bots in database:', allBots);
+      
+      res.json({
+        username: username,
+        found: !!bot,
+        botData: bot,
+        allBots: allBots || [],
+        totalBots: (allBots || []).length
+      });
     });
-  } catch (error) {
-    console.error('Error in debug endpoint:', error);
-    res.status(500).json({ error: 'Database error' });
-  }
+  });
+});
+
+// Test endpoint to check database directly
+app.get('/api/admin/bots/test', authenticateAdmin, (req, res) => {
+  console.log('🔍 Test endpoint called');
+  
+  db.all('SELECT name FROM sqlite_master WHERE type="table"', (err, tables) => {
+    if (err) {
+      console.error('Error getting tables:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    console.log('🔍 Available tables:', tables);
+    
+    db.all('SELECT * FROM bot_blacklist', (err, bots) => {
+      if (err) {
+        console.error('Error getting bots:', err);
+        return res.status(500).json({ error: 'Bot blacklist table error', tables: tables });
+      }
+      
+      res.json({
+        tables: tables,
+        botBlacklistExists: tables.some(t => t.name === 'bot_blacklist'),
+        bots: bots || [],
+        botCount: (bots || []).length
+      });
+    });
+  });
 });
 
 app.post('/api/admin/bots', authenticateAdmin, async (req, res) => {
