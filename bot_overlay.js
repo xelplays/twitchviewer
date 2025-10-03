@@ -402,12 +402,16 @@ async function validateClipOwnership(clipUrl, username) {
     
     const clip = data.data[0];
     const clipCreator = clip.creator_name.toLowerCase();
+    const clipBroadcaster = clip.broadcaster_name.toLowerCase();
     const usernameLower = username.toLowerCase();
     
-    console.log(`🔍 Clip creator: ${clipCreator}, Username: ${usernameLower}`);
-    console.log(`🔍 Ownership match: ${clipCreator === usernameLower}`);
+    console.log(`🔍 Clip creator: ${clipCreator}, Clip broadcaster: ${clipBroadcaster}, Username: ${usernameLower}`);
     
-    return clipCreator === usernameLower;
+    // Allow if user is the broadcaster (channel owner) OR the creator
+    const isOwner = (clipBroadcaster === usernameLower) || (clipCreator === usernameLower);
+    console.log(`🔍 Ownership match: ${isOwner} (broadcaster: ${clipBroadcaster === usernameLower}, creator: ${clipCreator === usernameLower})`);
+    
+    return isOwner;
   } catch (error) {
     console.error('Error validating clip ownership:', error);
     console.log(`🔍 Exception - returning false for clip ownership validation`);
