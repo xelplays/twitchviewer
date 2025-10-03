@@ -348,9 +348,32 @@ app.get('/top10', async (req, res) => {
 app.get('/api/admin/bots', authenticateAdmin, async (req, res) => {
   try {
     const bots = await db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC');
+    console.log('🔍 API /api/admin/bots - Found bots:', bots);
     res.json(bots);
   } catch (error) {
     console.error('Error fetching bots:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Debug endpoint to check specific user
+app.get('/api/admin/bots/debug/:username', authenticateAdmin, async (req, res) => {
+  try {
+    const username = req.params.username.toLowerCase();
+    const bot = await db.get('SELECT * FROM bot_blacklist WHERE username = ?', [username]);
+    const allBots = await db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC');
+    
+    console.log(`🔍 Debug check for ${username}:`, bot ? 'FOUND' : 'NOT FOUND');
+    console.log('🔍 All bots in database:', allBots);
+    
+    res.json({
+      username: username,
+      found: !!bot,
+      botData: bot,
+      allBots: allBots
+    });
+  } catch (error) {
+    console.error('Error in debug endpoint:', error);
     res.status(500).json({ error: 'Database error' });
   }
 });
@@ -1041,6 +1064,26 @@ async function handleChatMessage({ channel, user, message, msg }) {
           sendChatMessage( `@${username} ${userToCheck} ist in der Bot-Blacklist (Grund: ${row.reason || 'Bot'})`);
         } else {
           sendChatMessage( `@${username} ${userToCheck} ist NICHT in der Bot-Blacklist`);
+        }
+      });
+      break;
+      
+    case '!botfix':
+      if (!isAdmin) break;
+      
+      // Remove yourself from bot blacklist if you're there
+      const botUsername = username.toLowerCase();
+      db.run('DELETE FROM bot_blacklist WHERE username = ?', [botUsername], function(err) {
+        if (err) {
+          console.error('Error removing bot:', err);
+          sendChatMessage( `@${username} Fehler beim Entfernen von ${botUsername}!`);
+          return;
+        }
+        
+        if (this.changes > 0) {
+          sendChatMessage( `@${username} ${botUsername} wurde von der Bot-Blacklist entfernt! (${this.changes} Einträge entfernt)`);
+        } else {
+          sendChatMessage( `@${username} ${botUsername} war nicht in der Blacklist.`);
         }
       });
       break;
