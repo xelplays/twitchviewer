@@ -1442,25 +1442,46 @@ async function sendChatMessage(message) {
 async function sendChatMessageViaAPI(message) {
   try {
     // Get broadcaster ID
-    const userResponse = await fetch(`https://api.twitch.tv/helix/users?login=${config.channel}`, {
+    const broadcasterResponse = await fetch(`https://api.twitch.tv/helix/users?login=${config.channel}`, {
       headers: {
         'Client-ID': config.twitchBotAppClientId,
         'Authorization': `Bearer ${config.twitchBotAppAccessToken}`
       }
     });
     
-    if (!userResponse.ok) {
-      console.error('❌ Failed to get broadcaster ID:', userResponse.status);
+    if (!broadcasterResponse.ok) {
+      console.error('❌ Failed to get broadcaster ID:', broadcasterResponse.status);
       return false;
     }
     
-    const userData = await userResponse.json();
-    if (!userData.data || userData.data.length === 0) {
+    const broadcasterData = await broadcasterResponse.json();
+    if (!broadcasterData.data || broadcasterData.data.length === 0) {
       console.error('❌ Broadcaster not found');
       return false;
     }
     
-    const broadcasterId = userData.data[0].id;
+    const broadcasterId = broadcasterData.data[0].id;
+    
+    // Get bot user ID
+    const botResponse = await fetch(`https://api.twitch.tv/helix/users?login=${config.botUsername}`, {
+      headers: {
+        'Client-ID': config.twitchBotAppClientId,
+        'Authorization': `Bearer ${config.twitchBotAppAccessToken}`
+      }
+    });
+    
+    if (!botResponse.ok) {
+      console.error('❌ Failed to get bot user ID:', botResponse.status);
+      return false;
+    }
+    
+    const botData = await botResponse.json();
+    if (!botData.data || botData.data.length === 0) {
+      console.error('❌ Bot user not found');
+      return false;
+    }
+    
+    const botUserId = botData.data[0].id;
     
     // Send chat message via API
     const chatResponse = await fetch(`https://api.twitch.tv/helix/chat/messages`, {
@@ -1472,7 +1493,7 @@ async function sendChatMessageViaAPI(message) {
       },
       body: JSON.stringify({
         broadcaster_id: broadcasterId,
-        sender_id: broadcasterId, // Bot user ID (should be the broadcaster or authorized user)
+        sender_id: botUserId, // Bot user ID (not broadcaster ID!)
         message: message
       })
     });
@@ -1483,7 +1504,7 @@ async function sendChatMessageViaAPI(message) {
       return false;
     }
     
-    console.log('✅ Chat message sent via API successfully');
+    console.log('✅ Chat message sent via API successfully with bot user ID:', botUserId);
     return true;
   } catch (error) {
     console.error('❌ Error sending chat message via API:', error);

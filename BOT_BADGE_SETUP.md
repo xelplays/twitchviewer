@@ -2,6 +2,15 @@
 
 Dieser Guide erklärt, wie du das **Chat Bot Badge** für deinen Twitch Bot aktivierst, basierend auf der [offiziellen Twitch Dokumentation](https://dev.twitch.tv/docs/chat/#chatbot-badge-and-chat-identity).
 
+## ⚠️ WICHTIGER HINWEIS
+
+**Du brauchst einen SEPARATEN BOT-ACCOUNT!** 
+
+- Der Bot-Account muss **anders** sein als dein Streamer-Account
+- Der Bot-Username muss in `BOT_USERNAME` gesetzt sein
+- Der Bot-Account muss den `channel:bot` Scope vom Streamer autorisiert bekommen
+- **NICHT** deinen Streamer-Account als Bot verwenden!
+
 ## 🎯 Was ist das Chat Bot Badge?
 
 Das Chat Bot Badge ist ein spezielles Badge, das Twitch-Chatbots anzeigen können, um zu zeigen, dass sie programmatisch Nachrichten senden. Es erscheint neben dem Bot-Namen im Chat und kategorisiert den Bot unter "Chat Bots" in der "Users in Chat" Liste.
@@ -45,12 +54,16 @@ Die Antwort sollte so aussehen:
 
 ### 3. channel:bot Scope autorisieren
 
+**WICHTIG**: Du brauchst einen **separaten Bot-Account** (nicht deinen Streamer-Account!)
+
 Der Broadcaster (Streamer) muss den `channel:bot` Scope für deinen Bot autorisieren:
 
 1. Gehe zu: `https://id.twitch.tv/oauth2/authorize?client_id=YOUR_BOT_CLIENT_ID&redirect_uri=http://localhost&response_type=code&scope=channel:bot`
 2. Logge dich mit dem **Broadcaster-Account** ein (nicht dem Bot-Account!)
 3. Autorisiere den Bot
 4. Kopiere den Authorization Code aus der URL
+
+**Wichtig**: Der Bot muss ein **separater Account** sein, nicht dein Streamer-Account!
 
 ### 4. Environment Variables setzen
 
