@@ -32,7 +32,6 @@ const config = {
   twitchClientId: process.env.TWITCH_CLIENT_ID,
   twitchClientSecret: process.env.TWITCH_CLIENT_SECRET,
   twitchBotClientId: process.env.TWITCH_BOT_CLIENT_ID || process.env.TWITCH_CLIENT_ID,
-  twitchBotAccessToken: process.env.TWITCH_BOT_APP_ACCESS_TOKEN, // Use same token for stream checking
   twitchBotAppAccessToken: process.env.TWITCH_BOT_APP_ACCESS_TOKEN,
   twitchBotAppClientId: process.env.TWITCH_BOT_APP_CLIENT_ID || process.env.TWITCH_BOT_CLIENT_ID || process.env.TWITCH_CLIENT_ID,
   enableEventSub: process.env.ENABLE_EVENTSUB === 'true',
@@ -138,11 +137,6 @@ function authenticateAdmin(req, res, next) {
 // Helper function to check if stream is live
 async function isStreamLive() {
   try {
-    if (!config.twitchBotAccessToken || !config.twitchBotClientId) {
-      console.log('⚠️ Stream check disabled - missing Twitch API credentials');
-      return true; // Allow chat points when API is not configured
-    }
-    
     const response = await fetch(`https://api.twitch.tv/helix/streams?user_login=${config.channel}`, {
       headers: {
         'Client-ID': config.twitchBotClientId,
@@ -151,44 +145,28 @@ async function isStreamLive() {
     });
     
     if (!response.ok) {
-      if (response.status === 401) {
-        console.error('❌ Stream check failed - Invalid Twitch API token (401 Unauthorized)');
-      } else {
-        console.error(`❌ Stream check failed - HTTP ${response.status}`);
-      }
-      return true; // Allow chat points on API errors to avoid blocking users
+      console.error('Error checking stream status:', response.status);
+      return false;
     }
     
     const data = await response.json();
-    const isLive = data.data && data.data.length > 0;
-    console.log(`📺 Stream status: ${isLive ? 'LIVE' : 'OFFLINE'}`);
-    return isLive;
+    return data.data && data.data.length > 0;
   } catch (error) {
     console.error('Error checking stream status:', error);
-    return true; // Allow chat points on errors to avoid blocking users
+    return false;
   }
 }
 
 // Helper function to check if user is a bot
-function isUserBot(username) {
-  return new Promise((resolve, reject) => {
-    const lowerUsername = username.toLowerCase();
-    console.log(`🔍 Bot check for "${username}" (lowercase: "${lowerUsername}")`);
-    
-    db.get('SELECT * FROM bot_blacklist WHERE username = ?', [lowerUsername], (err, result) => {
-      if (err) {
-        console.error('Error checking bot status:', err);
-        resolve(false);
-        return;
-      }
-      
-      console.log(`🔍 Bot check result for "${username}":`, result ? 'FOUND IN BLACKLIST' : 'NOT FOUND');
-      if (result) {
-        console.log(`🔍 Bot details:`, result);
-      }
-      resolve(!!result);
-    });
-  });
+async function isUserBot(username) {
+  try {
+    const result = await db.get('SELECT * FROM bot_blacklist WHERE username = ?', [username.toLowerCase()]);
+    console.log(`🔍 Bot check for ${username}:`, result ? 'FOUND IN BLACKLIST' : 'NOT FOUND');
+    return !!result;
+  } catch (error) {
+    console.error('Error checking bot status:', error);
+    return false;
+  }
 }
 
 // Helper function to validate clip ownership
@@ -367,81 +345,14 @@ app.get('/top10', async (req, res) => {
 });
 
 // Bot Management API endpoints
-app.get('/api/admin/bots', authenticateAdmin, (req, res) => {
-  console.log('🔍 API /api/admin/bots called');
-  
-  db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC', (err, rows) => {
-    if (err) {
-      console.error('Error fetching bots:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    
-    console.log('🔍 API /api/admin/bots - Found bots:', rows);
-    console.log('🔍 API /api/admin/bots - Bots count:', rows ? rows.length : 0);
-    
-    // Ensure we always return an array
-    const bots = Array.isArray(rows) ? rows : [];
+app.get('/api/admin/bots', authenticateAdmin, async (req, res) => {
+  try {
+    const bots = await db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC');
     res.json(bots);
-  });
-});
-
-// Debug endpoint to check specific user
-app.get('/api/admin/bots/debug/:username', authenticateAdmin, (req, res) => {
-  const username = req.params.username.toLowerCase();
-  console.log(`🔍 Debug endpoint called for: ${username}`);
-  
-  db.get('SELECT * FROM bot_blacklist WHERE username = ?', [username], (err, bot) => {
-    if (err) {
-      console.error('Error in debug endpoint:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    
-    db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC', (err, allBots) => {
-      if (err) {
-        console.error('Error fetching all bots:', err);
-        return res.status(500).json({ error: 'Database error' });
-      }
-      
-      console.log(`🔍 Debug check for ${username}:`, bot ? 'FOUND' : 'NOT FOUND');
-      console.log('🔍 All bots in database:', allBots);
-      
-      res.json({
-        username: username,
-        found: !!bot,
-        botData: bot,
-        allBots: allBots || [],
-        totalBots: (allBots || []).length
-      });
-    });
-  });
-});
-
-// Test endpoint to check database directly
-app.get('/api/admin/bots/test', authenticateAdmin, (req, res) => {
-  console.log('🔍 Test endpoint called');
-  
-  db.all('SELECT name FROM sqlite_master WHERE type="table"', (err, tables) => {
-    if (err) {
-      console.error('Error getting tables:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    
-    console.log('🔍 Available tables:', tables);
-    
-    db.all('SELECT * FROM bot_blacklist', (err, bots) => {
-      if (err) {
-        console.error('Error getting bots:', err);
-        return res.status(500).json({ error: 'Bot blacklist table error', tables: tables });
-      }
-      
-      res.json({
-        tables: tables,
-        botBlacklistExists: tables.some(t => t.name === 'bot_blacklist'),
-        bots: bots || [],
-        botCount: (bots || []).length
-      });
-    });
-  });
+  } catch (error) {
+    console.error('Error fetching bots:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 app.post('/api/admin/bots', authenticateAdmin, async (req, res) => {
@@ -876,14 +787,6 @@ async function handleChatMessage({ channel, user, message, msg }) {
   const isBroadcaster = msg.userInfo.isBroadcaster;
   const isAdmin = isMod || isBroadcaster;
   
-  // Log the message for debugging
-  console.log(`📝 Chat: ${username}: ${message}`);
-  
-  // Check if message starts with command
-  if (message.startsWith('!')) {
-    console.log(`🎯 Command detected: ${message} from ${username} (Admin: ${isAdmin})`);
-  }
-  
   // Update user presence
   const now = getCurrentTimestamp();
   let userData = await getUser(username);
@@ -898,98 +801,6 @@ async function handleChatMessage({ channel, user, message, msg }) {
     message_count: (userData.message_count || 0) + 1,
     display_name: displayName
   });
-  
-  // Parse commands first (commands should always work regardless of stream status)
-  const args = message.trim().split(' ');
-  const command = args[0].toLowerCase();
-  
-  console.log(`🔍 Parsed command: "${command}" from message: "${message}"`);
-  
-  // Handle commands first
-  if (command.startsWith('!')) {
-    switch (command) {
-      case '!punkte':
-      case '!points':
-        console.log(`🎯 Processing !points command from ${username}`);
-        const userPoints = await getUser(username);
-        console.log(`🎯 User points data:`, userPoints);
-        sendChatMessage( `@${username} hat ${userPoints.points} Punkte! 🎯`);
-        return; // Exit after handling command
-        
-      case '!top':
-      case '!leaderboard':
-        try {
-          console.log(`🏆 Processing !top command from ${username}`);
-          const topUsers = await getTopUsers(5);
-          const leaderboard = topUsers.map((user, index) => 
-            `${index + 1}. ${user.display_name || user.username}: ${user.points}`
-          ).join(' | ');
-          sendChatMessage( `🏆 Top 5: ${leaderboard}`);
-        } catch (error) {
-          console.error('Error fetching leaderboard:', error);
-        }
-        return; // Exit after handling command
-        
-      case '!botlist':
-        if (!isAdmin) break;
-        
-        db.all('SELECT username, reason, added_at FROM bot_blacklist ORDER BY added_at DESC LIMIT 10', (err, rows) => {
-          if (err) {
-            console.error('Error fetching bot list:', err);
-            return;
-          }
-          
-          if (rows.length === 0) {
-            sendChatMessage( `@${username} Keine Bots in der Blacklist.`);
-          } else {
-            const botsList = rows.map(bot => `${bot.username} (${bot.reason || 'Bot'})`).join(', ');
-            sendChatMessage( `@${username} Bot Blacklist: ${botsList}`);
-          }
-        });
-        return; // Exit after handling command
-        
-      case '!botdebug':
-        if (!isAdmin) break;
-        
-        db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC', (err, allBots) => {
-          if (err) {
-            console.error('Error getting all bots:', err);
-            sendChatMessage( `@${username} Fehler beim Abrufen der Bot-Liste!`);
-            return;
-          }
-          
-          const botList = allBots.map(bot => `${bot.username} (${bot.reason})`).join(', ');
-          sendChatMessage( `@${username} Alle Bots in DB: ${botList || 'Keine'}`);
-          
-          const currentUserInList = allBots.find(bot => bot.username === username.toLowerCase());
-          if (currentUserInList) {
-            sendChatMessage( `@${username} Du bist in der Liste: ${currentUserInList.username} (${currentUserInList.reason})`);
-          } else {
-            sendChatMessage( `@${username} Du bist NICHT in der Bot-Liste!`);
-          }
-        });
-        return; // Exit after handling command
-        
-      case '!botfix':
-        if (!isAdmin) break;
-        
-        const botUsername = username.toLowerCase();
-        db.run('DELETE FROM bot_blacklist WHERE username = ?', [botUsername], function(err) {
-          if (err) {
-            console.error('Error removing bot:', err);
-            sendChatMessage( `@${username} Fehler beim Entfernen von ${botUsername}!`);
-            return;
-          }
-          
-          if (this.changes > 0) {
-            sendChatMessage( `@${username} ${botUsername} wurde von der Bot-Blacklist entfernt! (${this.changes} Einträge entfernt)`);
-          } else {
-            sendChatMessage( `@${username} ${botUsername} war nicht in der Blacklist.`);
-          }
-        });
-        return; // Exit after handling command
-    }
-  }
   
   // Award chat points (with anti-spam measures and live stream check)
   const enableChatPoints = true; // Set to true to enable chat points
@@ -1034,10 +845,22 @@ async function handleChatMessage({ channel, user, message, msg }) {
       }
     }
   }
-}
-
-// Database utility functions
-function getUser(username) {
+  
+  // Parse commands
+  const args = message.trim().split(' ');
+  const command = args[0].toLowerCase();
+  
+  switch (command) {
+    case '!punkte':
+    case '!points':
+      const userPoints = await getUser(username);
+      sendChatMessage( `@${username} hat ${userPoints.points} Punkte! 🎯`);
+      break;
+      
+    case '!top':
+    case '!leaderboard':
+      try {
+        const topUsers = await getTopUsers(5);
         const leaderboard = topUsers.map((user, index) => 
           `${index + 1}. ${user.display_name || user.username}: ${user.points}`
         ).join(' | ');
@@ -1218,50 +1041,6 @@ function getUser(username) {
           sendChatMessage( `@${username} ${userToCheck} ist in der Bot-Blacklist (Grund: ${row.reason || 'Bot'})`);
         } else {
           sendChatMessage( `@${username} ${userToCheck} ist NICHT in der Bot-Blacklist`);
-        }
-      });
-      break;
-      
-    case '!botfix':
-      if (!isAdmin) break;
-      
-      // Remove yourself from bot blacklist if you're there
-      const botUsername = username.toLowerCase();
-      db.run('DELETE FROM bot_blacklist WHERE username = ?', [botUsername], function(err) {
-        if (err) {
-          console.error('Error removing bot:', err);
-          sendChatMessage( `@${username} Fehler beim Entfernen von ${botUsername}!`);
-          return;
-        }
-        
-        if (this.changes > 0) {
-          sendChatMessage( `@${username} ${botUsername} wurde von der Bot-Blacklist entfernt! (${this.changes} Einträge entfernt)`);
-        } else {
-          sendChatMessage( `@${username} ${botUsername} war nicht in der Blacklist.`);
-        }
-      });
-      break;
-      
-    case '!botdebug':
-      if (!isAdmin) break;
-      
-      // Show all bots and check specific user
-      db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC', (err, allBots) => {
-        if (err) {
-          console.error('Error getting all bots:', err);
-          sendChatMessage( `@${username} Fehler beim Abrufen der Bot-Liste!`);
-          return;
-        }
-        
-        const botList = allBots.map(bot => `${bot.username} (${bot.reason})`).join(', ');
-        sendChatMessage( `@${username} Alle Bots in DB: ${botList || 'Keine'}`);
-        
-        // Check if current user is in list
-        const currentUserInList = allBots.find(bot => bot.username === username.toLowerCase());
-        if (currentUserInList) {
-          sendChatMessage( `@${username} Du bist in der Liste: ${currentUserInList.username} (${currentUserInList.reason})`);
-        } else {
-          sendChatMessage( `@${username} Du bist NICHT in der Bot-Liste!`);
         }
       });
       break;
@@ -1802,7 +1581,6 @@ async function sendChatMessageViaAPI(message) {
 
 // Event handlers
 chatClient.onMessage(async (channel, user, text, msg) => {
-  console.log(`💬 Chat message: ${user.username}: ${text}`);
   await handleChatMessage({ channel, user, message: text, msg });
 });
 
