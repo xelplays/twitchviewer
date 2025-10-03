@@ -71,8 +71,27 @@ const db = new sqlite3.Database(dbPath, (err) => {
 });
 
 // Initialize database if it doesn't exist
-const initDb = require('./migrations/init_db');
-initDb();
+const fs = require('fs');
+const path = require('path');
+
+function initDatabase() {
+  console.log('Initializing database...');
+  
+  // Read and execute init.sql
+  const initSqlPath = path.join(__dirname, 'migrations', 'init.sql');
+  const sql = fs.readFileSync(initSqlPath, 'utf8');
+  
+  db.exec(sql, (err) => {
+    if (err) {
+      console.error('Error running migrations:', err.message);
+    } else {
+      console.log('Database initialized successfully!');
+    }
+  });
+}
+
+// Run database initialization
+initDatabase();
 
 // Twitch Chat Client Configuration
 const authProvider = new StaticAuthProvider(config.twitchClientId, config.botOauth.substring(6));
