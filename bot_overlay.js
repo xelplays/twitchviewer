@@ -372,15 +372,29 @@ app.get('/api/admin/bots', authenticateAdmin, async (req, res) => {
 // Debug endpoint to check database directly
 app.get('/api/admin/bots/debug', authenticateAdmin, async (req, res) => {
   try {
-    const allBots = await db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC');
-    const emptyBots = await db.all('SELECT * FROM bot_blacklist WHERE username IS NULL OR username = "" OR TRIM(username) = ""');
-    const validBots = await db.all('SELECT * FROM bot_blacklist WHERE username IS NOT NULL AND username != "" AND TRIM(username) != ""');
+    // Check if table exists
+    const tableCheck = await db.all("SELECT name FROM sqlite_master WHERE type='table' AND name='bot_blacklist'");
+    console.log('🔍 Debug - Table exists:', tableCheck);
     
+    // Get table schema
+    const schema = await db.all("PRAGMA table_info(bot_blacklist)");
+    console.log('🔍 Debug - Table schema:', schema);
+    
+    // Try to get all bots
+    const allBots = await db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC');
     console.log('🔍 Debug - All bots:', allBots);
+    
+    // Try to get empty bots
+    const emptyBots = await db.all('SELECT * FROM bot_blacklist WHERE username IS NULL OR username = "" OR TRIM(username) = ""');
     console.log('🔍 Debug - Empty bots:', emptyBots);
+    
+    // Try to get valid bots
+    const validBots = await db.all('SELECT * FROM bot_blacklist WHERE username IS NOT NULL AND username != "" AND TRIM(username) != ""');
     console.log('🔍 Debug - Valid bots:', validBots);
     
     res.json({
+      tableExists: tableCheck.length > 0,
+      tableSchema: schema,
       allBots: allBots,
       emptyBots: emptyBots,
       validBots: validBots,
@@ -392,7 +406,33 @@ app.get('/api/admin/bots/debug', authenticateAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error('Error in debug endpoint:', error);
-    res.status(500).json({ error: 'Database error' });
+    res.status(500).json({ error: 'Database error: ' + error.message });
+  }
+});
+
+// Test endpoint to add a bot manually
+app.post('/api/admin/bots/test', authenticateAdmin, async (req, res) => {
+  try {
+    const testUsername = 'testbot_' + Date.now();
+    const result = await db.run(
+      'INSERT INTO bot_blacklist (username, added_by, added_at, reason) VALUES (?, ?, ?, ?)',
+      [testUsername, 'admin', Math.floor(Date.now() / 1000), 'Test bot']
+    );
+    
+    console.log('🔍 Test - Added bot:', testUsername, 'ID:', result.lastID);
+    
+    // Verify it was added
+    const addedBot = await db.get('SELECT * FROM bot_blacklist WHERE id = ?', [result.lastID]);
+    console.log('🔍 Test - Verified bot:', addedBot);
+    
+    res.json({
+      success: true,
+      botId: result.lastID,
+      bot: addedBot
+    });
+  } catch (error) {
+    console.error('Error in test endpoint:', error);
+    res.status(500).json({ error: 'Database error: ' + error.message });
   }
 });
 
