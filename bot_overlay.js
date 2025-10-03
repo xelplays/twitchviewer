@@ -1234,6 +1234,7 @@ async function handleChatMessage({ channel, user, message, msg }) {
             
             // Submit clip
             const clipId = extractClipId(clipUrl);
+            const now = Date.now();
             db.run(
               'INSERT INTO clips (submitter, display_name, clip_url, clip_id, submitted_at) VALUES (?, ?, ?, ?, ?)',
               [username.toLowerCase(), displayName, clipUrl, clipId, now],
