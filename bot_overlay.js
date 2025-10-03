@@ -876,6 +876,14 @@ async function handleChatMessage({ channel, user, message, msg }) {
   const isBroadcaster = msg.userInfo.isBroadcaster;
   const isAdmin = isMod || isBroadcaster;
   
+  // Log the message for debugging
+  console.log(`📝 Chat: ${username}: ${message}`);
+  
+  // Check if message starts with command
+  if (message.startsWith('!')) {
+    console.log(`🎯 Command detected: ${message} from ${username} (Admin: ${isAdmin})`);
+  }
+  
   // Update user presence
   const now = getCurrentTimestamp();
   let userData = await getUser(username);
@@ -942,7 +950,9 @@ async function handleChatMessage({ channel, user, message, msg }) {
   switch (command) {
     case '!punkte':
     case '!points':
+      console.log(`🎯 Processing !points command from ${username}`);
       const userPoints = await getUser(username);
+      console.log(`🎯 User points data:`, userPoints);
       sendChatMessage( `@${username} hat ${userPoints.points} Punkte! 🎯`);
       break;
       
@@ -1714,6 +1724,7 @@ async function sendChatMessageViaAPI(message) {
 
 // Event handlers
 chatClient.onMessage(async (channel, user, text, msg) => {
+  console.log(`💬 Chat message: ${user.username}: ${text}`);
   await handleChatMessage({ channel, user, message: text, msg });
 });
 
