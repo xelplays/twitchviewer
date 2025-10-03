@@ -223,6 +223,141 @@ function isUserBot(username) {
   });
 }
 
+// Anti-Spam Configuration
+const SPAM_CONFIG = {
+  MIN_MESSAGE_LENGTH: 3,           // Minimum message length for points
+  CHAT_POINTS_COOLDOWN: 10,        // Seconds between chat points
+  MAX_MESSAGES_PER_MINUTE: 6,      // Max messages per minute to avoid spam
+  MAX_CHAT_POINTS_PER_HOUR: 60,    // Max chat points per hour
+  SPAM_DETECTION_WINDOW: 60        // Seconds to track for spam detection
+};
+
+// Helper function to check if user can receive chat points (anti-spam)
+function canReceiveChatPoints(username) {
+  return new Promise((resolve) => {
+    const now = Date.now();
+    const usernameLower = username.toLowerCase();
+    
+    // Check cooldown and message frequency
+    db.get(`
+      SELECT 
+        last_message_ts,
+        chat_points_last_hour,
+        chat_points_hour_reset_ts,
+        message_count
+      FROM points 
+      WHERE username = ?
+    `, [usernameLower], (err, userData) => {
+      if (err) {
+        console.error('Error checking spam protection:', err);
+        resolve(false);
+        return;
+      }
+      
+      if (!userData) {
+        // New user, allow points
+        resolve(true);
+        return;
+      }
+      
+      const timeSinceLastMessage = (now - userData.last_message_ts) / 1000;
+      const hourResetTime = (now - userData.chat_points_hour_reset_ts) / 1000;
+      
+      // Check cooldown (minimum time between chat points)
+      if (timeSinceLastMessage < SPAM_CONFIG.CHAT_POINTS_COOLDOWN) {
+        console.log(`🚫 Spam protection: ${username} in cooldown (${Math.round(timeSinceLastMessage)}s/${SPAM_CONFIG.CHAT_POINTS_COOLDOWN}s)`);
+        resolve(false);
+        return;
+      }
+      
+      // Check hourly limit (reset if hour has passed)
+      let currentHourPoints = userData.chat_points_last_hour;
+      if (hourResetTime >= 3600) {
+        currentHourPoints = 0; // Reset hourly counter
+      }
+      
+      if (currentHourPoints >= SPAM_CONFIG.MAX_CHAT_POINTS_PER_HOUR) {
+        console.log(`🚫 Spam protection: ${username} hit hourly limit (${currentHourPoints}/${SPAM_CONFIG.MAX_CHAT_POINTS_PER_HOUR})`);
+        resolve(false);
+        return;
+      }
+      
+      // Check recent message frequency
+      db.get(`
+        SELECT COUNT(*) as message_count 
+        FROM spam_tracking 
+        WHERE username = ? AND message_timestamp > ?
+      `, [usernameLower, now - (SPAM_CONFIG.SPAM_DETECTION_WINDOW * 1000)], (err, recentMessages) => {
+        if (err) {
+          console.error('Error checking recent messages:', err);
+          resolve(true); // Allow if error
+          return;
+        }
+        
+        if (recentMessages.message_count >= SPAM_CONFIG.MAX_MESSAGES_PER_MINUTE) {
+          console.log(`🚫 Spam protection: ${username} too many messages (${recentMessages.message_count}/${SPAM_CONFIG.MAX_MESSAGES_PER_MINUTE})`);
+          resolve(false);
+          return;
+        }
+        
+        resolve(true);
+      });
+    });
+  });
+}
+
+// Helper function to record message for spam tracking
+function recordMessageForSpamTracking(username, message) {
+  const now = Date.now();
+  const usernameLower = username.toLowerCase();
+  
+  // Insert into spam tracking
+  db.run(`
+    INSERT INTO spam_tracking (username, message_timestamp, message_length, created_at)
+    VALUES (?, ?, ?, ?)
+  `, [usernameLower, now, message.length, now], (err) => {
+    if (err) {
+      console.error('Error recording message for spam tracking:', err);
+    }
+  });
+  
+  // Clean up old spam tracking data (older than 1 hour)
+  db.run(`
+    DELETE FROM spam_tracking 
+    WHERE message_timestamp < ?
+  `, [now - 3600000], (err) => {
+    if (err) {
+      console.error('Error cleaning up spam tracking:', err);
+    }
+  });
+}
+
+// Helper function to update user's chat points tracking
+function updateChatPointsTracking(username) {
+  const now = Date.now();
+  const usernameLower = username.toLowerCase();
+  
+  db.run(`
+    UPDATE points 
+    SET 
+      last_message_ts = ?,
+      message_count = message_count + 1,
+      chat_points_last_hour = CASE 
+        WHEN chat_points_hour_reset_ts < ? THEN 1
+        ELSE chat_points_last_hour + 1
+      END,
+      chat_points_hour_reset_ts = CASE 
+        WHEN chat_points_hour_reset_ts < ? THEN ?
+        ELSE chat_points_hour_reset_ts
+      END
+    WHERE username = ?
+  `, [now, now - 3600000, now - 3600000, now, usernameLower], (err) => {
+    if (err) {
+      console.error('Error updating chat points tracking:', err);
+    }
+  });
+}
+
 // Helper function to validate clip ownership
 async function validateClipOwnership(clipUrl, username) {
   try {
@@ -950,10 +1085,19 @@ async function handleChatMessage({ channel, user, message, msg }) {
     display_name: displayName
   });
   
-  // Award chat points (with anti-spam measures and live stream check)
-  const enableChatPoints = true; // Set to true to enable chat points
+  // Record message for spam tracking
+  recordMessageForSpamTracking(username, message);
+  
+  // Award chat points (with comprehensive anti-spam measures)
+  const enableChatPoints = true;
   
   if (enableChatPoints) {
+    // Check minimum message length
+    if (message.length < SPAM_CONFIG.MIN_MESSAGE_LENGTH) {
+      console.log(`🚫 Message too short for points: ${username} (${message.length} chars)`);
+      return;
+    }
+    
     // Check if user is a bot
     const isBot = await isUserBot(username);
     if (isBot) {
@@ -968,30 +1112,19 @@ async function handleChatMessage({ channel, user, message, msg }) {
       return;
     }
     
-    const timeSinceLastMessage = now - (user.last_message_ts || 0);
-    const timeSinceHourReset = now - (user.chat_points_hour_reset_ts || 0);
-    
-    if (timeSinceLastMessage >= config.minSecondsBetweenChatPoints) {
-      let chatPointsThisHour = user.chat_points_last_hour || 0;
-      
-      // Reset hourly counter if needed
-      if (timeSinceHourReset >= 3600) {
-        chatPointsThisHour = 0;
-      }
-      
-      if (chatPointsThisHour < config.maxChatPointsPerHour) {
-        chatPointsThisHour += config.pointsPerMessage;
-        const newTotal = await addPointsToUser(username, config.pointsPerMessage, 'chat-message');
-        
-        console.log(`📝 Chat points: ${username} +${config.pointsPerMessage} (total: ${newTotal}) - Stream live: ${streamLive}`);
-        
-        await updateUser(username, {
-          last_message_ts: now,
-          chat_points_last_hour: chatPointsThisHour,
-          chat_points_hour_reset_ts: timeSinceHourReset >= 3600 ? now : user.chat_points_hour_reset_ts
-        });
-      }
+    // Check comprehensive anti-spam protection
+    const canReceivePoints = await canReceiveChatPoints(username);
+    if (!canReceivePoints) {
+      console.log(`🚫 Anti-spam protection blocked points for: ${username}`);
+      return;
     }
+    
+    // Award chat points
+    const newTotal = await addPointsToUser(username, config.pointsPerMessage, 'chat-message');
+    console.log(`📝 Chat points: ${username} +${config.pointsPerMessage} (total: ${newTotal})`);
+    
+    // Update chat points tracking
+    updateChatPointsTracking(username);
   }
   
   // Parse commands
@@ -1269,9 +1402,66 @@ async function handleChatMessage({ channel, user, message, msg }) {
            return;
          }
          
-         sendChatMessage( `@${username} Bot-Liste bereinigt! ${this.changes} leere Einträge entfernt.`);
-       });
-       break;
+      sendChatMessage( `@${username} Bot-Liste bereinigt! ${this.changes} leere Einträge entfernt.`);
+      });
+      break;
+      
+    case '!spamconfig':
+      if (!isAdmin) break;
+      
+      sendChatMessage(`@${username} Anti-Spam Config: Min ${SPAM_CONFIG.MIN_MESSAGE_LENGTH} chars, ${SPAM_CONFIG.CHAT_POINTS_COOLDOWN}s cooldown, max ${SPAM_CONFIG.MAX_MESSAGES_PER_MINUTE} msgs/min, max ${SPAM_CONFIG.MAX_CHAT_POINTS_PER_HOUR} pts/hour`);
+      break;
+      
+    case '!spamcheck':
+      if (!isAdmin) break;
+      
+      const checkUsername = args[1];
+      if (!checkUsername) {
+        sendChatMessage(`@${username} Usage: !spamcheck <username>`);
+        break;
+      }
+      
+      const canReceive = await canReceiveChatPoints(checkUsername);
+      const userData = await getUser(checkUsername);
+      
+      if (!userData) {
+        sendChatMessage(`@${username} User ${checkUsername} nicht gefunden!`);
+        break;
+      }
+      
+      const timeSinceLast = (Date.now() - userData.last_message_ts) / 1000;
+      const cooldownRemaining = Math.max(0, SPAM_CONFIG.CHAT_POINTS_COOLDOWN - timeSinceLast);
+      
+      sendChatMessage(`@${username} ${checkUsername}: Can receive points: ${canReceive}, Cooldown: ${Math.round(cooldownRemaining)}s, Hourly pts: ${userData.chat_points_last_hour}/${SPAM_CONFIG.MAX_CHAT_POINTS_PER_HOUR}`);
+      break;
+      
+    case '!spamreset':
+      if (!isAdmin) break;
+      
+      const resetUsername = args[1];
+      if (!resetUsername) {
+        sendChatMessage(`@${username} Usage: !spamreset <username>`);
+        break;
+      }
+      
+      const now = Date.now();
+      db.run(`
+        UPDATE points 
+        SET 
+          last_message_ts = 0,
+          chat_points_last_hour = 0,
+          chat_points_hour_reset_ts = ?
+        WHERE username = ?
+      `, [now, resetUsername.toLowerCase()], (err) => {
+        if (err) {
+          console.error('Error resetting spam data:', err);
+          sendChatMessage(`@${username} Fehler beim Reset der Spam-Daten für ${resetUsername}!`);
+          return;
+        }
+        
+        sendChatMessage(`@${username} Spam-Daten für ${resetUsername} zurückgesetzt!`);
+      });
+      break;
   
       case '!clipapprove':
       if (!isAdmin) break;

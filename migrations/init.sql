@@ -78,4 +78,16 @@ CREATE TABLE IF NOT EXISTS bot_blacklist (
   added_at INTEGER DEFAULT 0,
   reason TEXT
 );
+
+CREATE TABLE IF NOT EXISTS spam_tracking (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL,               -- lowercase username
+  message_timestamp INTEGER NOT NULL,   -- when message was sent
+  message_length INTEGER,               -- length of message
+  cooldown_remaining INTEGER DEFAULT 0, -- seconds until next points allowed
+  created_at INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_spam_tracking_username ON spam_tracking(username);
+CREATE INDEX IF NOT EXISTS idx_spam_tracking_timestamp ON spam_tracking(message_timestamp);
 COMMIT;
