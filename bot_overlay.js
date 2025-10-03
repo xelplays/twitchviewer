@@ -978,6 +978,48 @@ async function handleChatMessage({ channel, user, message, msg }) {
       }
       break;
       
+    case '!botlist':
+      if (!isAdmin) break;
+      
+      db.all('SELECT username, reason, added_at FROM bot_blacklist ORDER BY added_at DESC LIMIT 10', (err, rows) => {
+        if (err) {
+          console.error('Error fetching bot list:', err);
+          return;
+        }
+        
+        if (rows.length === 0) {
+          sendChatMessage( `@${username} Keine Bots in der Blacklist.`);
+        } else {
+          const botsList = rows.map(bot => `${bot.username} (${bot.reason || 'Bot'})`).join(', ');
+          sendChatMessage( `@${username} Bot Blacklist: ${botsList}`);
+        }
+      });
+      break;
+      
+    case '!botremove':
+      if (!isAdmin) break;
+      
+      if (args.length < 2) {
+        sendChatMessage( `@${username} Usage: !botremove <username>`);
+        break;
+      }
+      
+      const botToRemove = args[1].toLowerCase();
+      db.run('DELETE FROM bot_blacklist WHERE username = ?', [botToRemove], function(err) {
+        if (err) {
+          console.error('Error removing bot:', err);
+          sendChatMessage( `@${username} Fehler beim Entfernen von ${botToRemove}!`);
+          return;
+        }
+        
+        if (this.changes > 0) {
+          sendChatMessage( `@${username} ${botToRemove} wurde von der Bot-Blacklist entfernt!`);
+        } else {
+          sendChatMessage( `@${username} ${botToRemove} war nicht in der Blacklist.`);
+        }
+      });
+      break;
+
     case '!clipapprove':
       if (!isAdmin) break;
       
