@@ -32,23 +32,37 @@ Laut der [Twitch Dokumentation](https://dev.twitch.tv/docs/chat/#chatbot-badge-a
 2. Erstelle eine **neue App** für deinen Bot (oder verwende eine bestehende)
 3. Notiere dir die **Client ID** und **Client Secret**
 
-### 2. App Access Token generieren
+### 2. Bot User Access Token generieren
 
-Du musst ein **App Access Token** generieren (nicht User Access Token):
+Du brauchst einen **User Access Token** vom Bot-Account (nicht App Access Token):
 
+**Schritt 1: OAuth URL generieren**
 ```bash
-# Ersetze YOUR_CLIENT_ID und YOUR_CLIENT_SECRET mit deinen Werten
-curl -X POST 'https://id.twitch.tv/oauth2/token' \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d 'client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET&grant_type=client_credentials'
+# Ersetze YOUR_BOT_CLIENT_ID mit deiner Bot App Client ID
+https://id.twitch.tv/oauth2/authorize?client_id=YOUR_BOT_CLIENT_ID&redirect_uri=http://localhost&response_type=code&scope=chat:edit
 ```
 
-Die Antwort sollte so aussehen:
+**Schritt 2: Authorization Code holen**
+1. Gehe zur URL oben
+2. Logge dich mit dem **Bot-Account** ein (nicht Streamer!)
+3. Autorisiere die App
+4. Kopiere den `code` aus der URL (nach `code=`)
+
+**Schritt 3: Access Token generieren**
+```bash
+curl -X POST https://id.twitch.tv/oauth2/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=YOUR_BOT_CLIENT_ID&client_secret=YOUR_BOT_CLIENT_SECRET&code=AUTHORIZATION_CODE&grant_type=authorization_code&redirect_uri=http://localhost"
+```
+
+**Antwort:**
 ```json
 {
-  "access_token": "your_app_access_token_here",
-  "expires_in": 0,
-  "token_type": "Bearer"
+  "access_token": "YOUR_BOT_USER_ACCESS_TOKEN",
+  "refresh_token": "YOUR_REFRESH_TOKEN",
+  "expires_in": 14400,
+  "token_type": "Bearer",
+  "scope": ["chat:edit"]
 }
 ```
 
@@ -71,9 +85,13 @@ Füge diese Variablen zu deiner `.env` Datei hinzu:
 
 ```env
 # Bot Badge Configuration
-TWITCH_BOT_APP_ACCESS_TOKEN=your_app_access_token_here
+TWITCH_BOT_APP_ACCESS_TOKEN=YOUR_BOT_USER_ACCESS_TOKEN
 TWITCH_BOT_APP_CLIENT_ID=your_bot_client_id_here
 ```
+
+**Wichtig**: 
+- `TWITCH_BOT_APP_ACCESS_TOKEN` = Bot User Access Token (nicht App Access Token!)
+- Dieser Token läuft nach 4 Stunden ab und muss erneuert werden
 
 ### 5. Bot neu starten
 
@@ -109,15 +127,22 @@ Sende eine Test-Nachricht über den Bot:
 
 ### "Chat Bot Badge: Disabled"
 - Überprüfe, ob `TWITCH_BOT_APP_ACCESS_TOKEN` und `TWITCH_BOT_APP_CLIENT_ID` gesetzt sind
-- Stelle sicher, dass der App Access Token gültig ist
+- Stelle sicher, dass der Bot User Access Token gültig ist
 
 ### "Failed to send chat message via API"
+- **401 Unauthorized**: Bot User Access Token ist abgelaufen (läuft nach 4h ab!)
+- **401 sender_id mismatch**: Token gehört nicht zum Bot-Account
 - Überprüfe, ob der `channel:bot` Scope autorisiert ist
 - Stelle sicher, dass der Broadcaster den Bot autorisiert hat (nicht der Bot selbst)
 
 ### "Broadcaster not found"
 - Überprüfe, ob der `TWITCH_BOT_APP_CLIENT_ID` korrekt ist
 - Stelle sicher, dass der Channel-Name in der Konfiguration stimmt
+
+### ⚠️ Token läuft ab!
+- **Bot User Access Token** läuft nach 4 Stunden ab
+- **Refresh Token** verwenden oder neuen Token generieren
+- **App Access Token** läuft nie ab, aber funktioniert nicht für Chat Bot Badge
 
 ## 📋 Fallback-Verhalten
 
