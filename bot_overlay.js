@@ -169,6 +169,8 @@ function authenticateAdmin(req, res, next) {
 
 // Helper function to check if stream is live
 async function isStreamLive() {
+  console.log(`🔍 Stream offline check config: ${config.streamOfflineCheck} (env: ${process.env.STREAM_OFFLINE_CHECK})`);
+  
   // If stream offline check is disabled, always assume stream is live
   if (!config.streamOfflineCheck) {
     console.log('📺 Stream offline check disabled, assuming stream is live');
