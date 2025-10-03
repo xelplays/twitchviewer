@@ -32,6 +32,8 @@ const config = {
   twitchClientId: process.env.TWITCH_CLIENT_ID,
   twitchClientSecret: process.env.TWITCH_CLIENT_SECRET,
   twitchBotClientId: process.env.TWITCH_BOT_CLIENT_ID || process.env.TWITCH_CLIENT_ID,
+  twitchBotAppAccessToken: process.env.TWITCH_BOT_APP_ACCESS_TOKEN,
+  twitchBotAppClientId: process.env.TWITCH_BOT_APP_CLIENT_ID || process.env.TWITCH_BOT_CLIENT_ID || process.env.TWITCH_CLIENT_ID,
   enableEventSub: process.env.ENABLE_EVENTSUB === 'true',
   
   // OAuth Configuration
@@ -90,6 +92,9 @@ console.log('- Channel:', config.channel);
 console.log('- Token length:', config.botOauth.substring(6).length);
 console.log('- Dashboard Client ID:', config.twitchClientId);
 console.log('- Bot Client ID:', config.twitchBotClientId);
+console.log('- Bot App Access Token:', config.twitchBotAppAccessToken ? 'Configured' : 'Not configured');
+console.log('- Bot App Client ID:', config.twitchBotAppClientId);
+console.log('- Chat Bot Badge:', config.twitchBotAppAccessToken && config.twitchBotAppClientId ? 'Enabled' : 'Disabled');
 
 // Express app setup
 const app = express();
@@ -1410,15 +1415,78 @@ function runMonthlyJob() {
 // Helper function to send messages using twitch-chat-client API
 async function sendChatMessage(message) {
   console.log('🔍 sendChatMessage called with:', message);
+  
+  // Try to use Twitch API first (for Chat Bot Badge)
+  if (config.twitchBotAppAccessToken && config.twitchBotAppClientId) {
+    const success = await sendChatMessageViaAPI(message);
+    if (success) {
+      console.log('✅ Chat message sent via API (Bot Badge enabled)');
+      return true;
+    }
+  }
+  
+  // Fallback to IRC if API fails or not configured
   try {
-    // Use the correct twitch-chat-client method for sending messages
-    console.log('🔍 Sending message to channel:', config.channel);
+    console.log('🔍 Sending message to channel via IRC:', config.channel);
     await chatClient.say(config.channel, message);
-    console.log('✅ Message sent successfully');
+    console.log('✅ Message sent successfully via IRC');
     return true;
   } catch (error) {
-    console.log('❌ Failed to send message:', error.message);
+    console.log('❌ Failed to send message via IRC:', error.message);
     console.log('❌ Error details:', error);
+    return false;
+  }
+}
+
+// Send chat message via Twitch API (enables Chat Bot Badge)
+async function sendChatMessageViaAPI(message) {
+  try {
+    // Get broadcaster ID
+    const userResponse = await fetch(`https://api.twitch.tv/helix/users?login=${config.channel}`, {
+      headers: {
+        'Client-ID': config.twitchBotAppClientId,
+        'Authorization': `Bearer ${config.twitchBotAppAccessToken}`
+      }
+    });
+    
+    if (!userResponse.ok) {
+      console.error('❌ Failed to get broadcaster ID:', userResponse.status);
+      return false;
+    }
+    
+    const userData = await userResponse.json();
+    if (!userData.data || userData.data.length === 0) {
+      console.error('❌ Broadcaster not found');
+      return false;
+    }
+    
+    const broadcasterId = userData.data[0].id;
+    
+    // Send chat message via API
+    const chatResponse = await fetch(`https://api.twitch.tv/helix/chat/messages`, {
+      method: 'POST',
+      headers: {
+        'Client-ID': config.twitchBotAppClientId,
+        'Authorization': `Bearer ${config.twitchBotAppAccessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        broadcaster_id: broadcasterId,
+        sender_id: broadcasterId, // Bot user ID (should be the broadcaster or authorized user)
+        message: message
+      })
+    });
+    
+    if (!chatResponse.ok) {
+      const errorText = await chatResponse.text();
+      console.error('❌ Failed to send chat message via API:', chatResponse.status, errorText);
+      return false;
+    }
+    
+    console.log('✅ Chat message sent via API successfully');
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending chat message via API:', error);
     return false;
   }
 }
