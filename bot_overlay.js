@@ -164,8 +164,13 @@ async function isUserBot(username) {
     console.log(`🔍 Bot check for ${username}:`, result ? 'FOUND IN BLACKLIST' : 'NOT FOUND');
     if (result) {
       console.log(`🔍 Bot details:`, result);
+      console.log(`🔍 Bot details JSON:`, JSON.stringify(result));
+      console.log(`🔍 Bot username field:`, result.username);
+      console.log(`🔍 Bot username length:`, result.username ? result.username.length : 'null/undefined');
     }
-    return !!result;
+    
+    // Only consider it a bot if there's actually a valid username in the result
+    return !!(result && result.username && result.username.trim().length > 0);
   } catch (error) {
     console.error('Error checking bot status:', error);
     return false;
@@ -1086,6 +1091,21 @@ async function handleChatMessage({ channel, user, message, msg }) {
          } else {
            sendChatMessage( `@${username} ${botUsername} war nicht in der Blacklist.`);
          }
+       });
+       break;
+       
+     case '!botclean':
+       if (!isAdmin) break;
+       
+       // Remove empty or invalid entries from bot blacklist
+       db.run('DELETE FROM bot_blacklist WHERE username IS NULL OR username = "" OR TRIM(username) = ""', function(err) {
+         if (err) {
+           console.error('Error cleaning bot blacklist:', err);
+           sendChatMessage( `@${username} Fehler beim Bereinigen der Bot-Liste!`);
+           return;
+         }
+         
+         sendChatMessage( `@${username} Bot-Liste bereinigt! ${this.changes} leere Einträge entfernt.`);
        });
        break;
   
