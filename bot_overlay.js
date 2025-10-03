@@ -71,9 +71,6 @@ const db = new sqlite3.Database(dbPath, (err) => {
 });
 
 // Initialize database if it doesn't exist
-const fs = require('fs');
-const path = require('path');
-
 function initDatabase() {
   console.log('Initializing database...');
   
