@@ -162,6 +162,9 @@ async function isUserBot(username) {
   try {
     const result = await db.get('SELECT * FROM bot_blacklist WHERE username = ?', [username.toLowerCase()]);
     console.log(`🔍 Bot check for ${username}:`, result ? 'FOUND IN BLACKLIST' : 'NOT FOUND');
+    if (result) {
+      console.log(`🔍 Bot details:`, result);
+    }
     return !!result;
   } catch (error) {
     console.error('Error checking bot status:', error);
@@ -1042,10 +1045,51 @@ async function handleChatMessage({ channel, user, message, msg }) {
         } else {
           sendChatMessage( `@${username} ${userToCheck} ist NICHT in der Bot-Blacklist`);
         }
-      });
-      break;
-
-    case '!clipapprove':
+       });
+       break;
+       
+     case '!botdebug':
+       if (!isAdmin) break;
+       
+       db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC', (err, allBots) => {
+         if (err) {
+           console.error('Error getting all bots:', err);
+           sendChatMessage( `@${username} Fehler beim Abrufen der Bot-Liste!`);
+           return;
+         }
+         
+         const botList = allBots.map(bot => `${bot.username} (${bot.reason})`).join(', ');
+         sendChatMessage( `@${username} Alle Bots in DB: ${botList || 'Keine'}`);
+         
+         const currentUserInList = allBots.find(bot => bot.username === username.toLowerCase());
+         if (currentUserInList) {
+           sendChatMessage( `@${username} Du bist in der Liste: ${currentUserInList.username} (${currentUserInList.reason})`);
+         } else {
+           sendChatMessage( `@${username} Du bist NICHT in der Bot-Liste!`);
+         }
+       });
+       break;
+       
+     case '!botfix':
+       if (!isAdmin) break;
+       
+       const botUsername = username.toLowerCase();
+       db.run('DELETE FROM bot_blacklist WHERE username = ?', [botUsername], function(err) {
+         if (err) {
+           console.error('Error removing bot:', err);
+           sendChatMessage( `@${username} Fehler beim Entfernen von ${botUsername}!`);
+           return;
+         }
+         
+         if (this.changes > 0) {
+           sendChatMessage( `@${username} ${botUsername} wurde von der Bot-Blacklist entfernt! (${this.changes} Einträge entfernt)`);
+         } else {
+           sendChatMessage( `@${username} ${botUsername} war nicht in der Blacklist.`);
+         }
+       });
+       break;
+  
+      case '!clipapprove':
       if (!isAdmin) break;
       
       if (args.length < 3) {
