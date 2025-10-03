@@ -158,15 +158,25 @@ async function isStreamLive() {
 }
 
 // Helper function to check if user is a bot
-async function isUserBot(username) {
-  try {
-    const result = await db.get('SELECT * FROM bot_blacklist WHERE username = ?', [username.toLowerCase()]);
-    console.log(`🔍 Bot check for ${username}:`, result ? 'FOUND IN BLACKLIST' : 'NOT FOUND');
-    return !!result;
-  } catch (error) {
-    console.error('Error checking bot status:', error);
-    return false;
-  }
+function isUserBot(username) {
+  return new Promise((resolve, reject) => {
+    const lowerUsername = username.toLowerCase();
+    console.log(`🔍 Bot check for "${username}" (lowercase: "${lowerUsername}")`);
+    
+    db.get('SELECT * FROM bot_blacklist WHERE username = ?', [lowerUsername], (err, result) => {
+      if (err) {
+        console.error('Error checking bot status:', err);
+        resolve(false);
+        return;
+      }
+      
+      console.log(`🔍 Bot check result for "${username}":`, result ? 'FOUND IN BLACKLIST' : 'NOT FOUND');
+      if (result) {
+        console.log(`🔍 Bot details:`, result);
+      }
+      resolve(!!result);
+    });
+  });
 }
 
 // Helper function to validate clip ownership
@@ -1128,6 +1138,30 @@ async function handleChatMessage({ channel, user, message, msg }) {
           sendChatMessage( `@${username} ${botUsername} wurde von der Bot-Blacklist entfernt! (${this.changes} Einträge entfernt)`);
         } else {
           sendChatMessage( `@${username} ${botUsername} war nicht in der Blacklist.`);
+        }
+      });
+      break;
+      
+    case '!botdebug':
+      if (!isAdmin) break;
+      
+      // Show all bots and check specific user
+      db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC', (err, allBots) => {
+        if (err) {
+          console.error('Error getting all bots:', err);
+          sendChatMessage( `@${username} Fehler beim Abrufen der Bot-Liste!`);
+          return;
+        }
+        
+        const botList = allBots.map(bot => `${bot.username} (${bot.reason})`).join(', ');
+        sendChatMessage( `@${username} Alle Bots in DB: ${botList || 'Keine'}`);
+        
+        // Check if current user is in list
+        const currentUserInList = allBots.find(bot => bot.username === username.toLowerCase());
+        if (currentUserInList) {
+          sendChatMessage( `@${username} Du bist in der Liste: ${currentUserInList.username} (${currentUserInList.reason})`);
+        } else {
+          sendChatMessage( `@${username} Du bist NICHT in der Bot-Liste!`);
         }
       });
       break;
