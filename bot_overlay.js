@@ -131,6 +131,19 @@ app.use('/twitch_panel', express.static(path.join(__dirname, 'twitch_panel')));
 app.use('/twitch_extension', express.static(path.join(__dirname, 'twitch_extension')));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// OBS-specific overlay routes
+app.get('/obs', (req, res) => {
+  res.redirect('/overlay/obs_leaderboard.html');
+});
+
+app.get('/obs-mini', (req, res) => {
+  res.redirect('/overlay/obs_leaderboard_mini.html');
+});
+
+app.get('/obs-ultra', (req, res) => {
+  res.redirect('/overlay/obs_leaderboard_ultra.html');
+});
+
 // Session configuration
 app.use(session({
   secret: config.sessionSecret,

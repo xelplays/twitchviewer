@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OBS Leaderboard Mini</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: transparent;
+            color: #ffffff;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .leaderboard-container {
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(8px);
+            border-radius: 8px;
+            padding: 12px 16px;
+            min-width: 200px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .title {
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 10px;
+            color: #9146ff;
+            opacity: 0.9;
+        }
+
+        .leaderboard {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .player {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+            transition: background 0.2s ease;
+        }
+
+        .player:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .rank {
+            font-weight: 700;
+            font-size: 12px;
+            color: #9146ff;
+            min-width: 16px;
+        }
+
+        .rank.first {
+            color: #ffd700;
+        }
+
+        .rank.second {
+            color: #c0c0c0;
+        }
+
+        .rank.third {
+            color: #cd7f32;
+        }
+
+        .name {
+            font-weight: 500;
+            font-size: 11px;
+            color: #ffffff;
+            flex: 1;
+            margin-left: 6px;
+            opacity: 0.9;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .points {
+            font-weight: 600;
+            font-size: 10px;
+            color: #00d4aa;
+            background: rgba(0, 212, 170, 0.08);
+            padding: 1px 6px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 212, 170, 0.2);
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            font-size: 11px;
+            padding: 15px;
+        }
+
+        .error {
+            text-align: center;
+            color: #ff4444;
+            font-size: 10px;
+            padding: 8px;
+            background: rgba(255, 68, 68, 0.08);
+            border-radius: 4px;
+        }
+
+        /* Subtle animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-5px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .player {
+            animation: fadeIn 0.2s ease forwards;
+        }
+
+        .player:nth-child(1) { animation-delay: 0.05s; }
+        .player:nth-child(2) { animation-delay: 0.1s; }
+        .player:nth-child(3) { animation-delay: 0.15s; }
+    </style>
+</head>
+<body>
+    <div class="leaderboard-container">
+        <div class="title">🏆 Top 3</div>
+        <div class="leaderboard" id="leaderboard">
+            <div class="loading">Lade...</div>
+        </div>
+    </div>
+
+    <script>
+        let refreshInterval;
+
+        async function loadLeaderboard() {
+            try {
+                const response = await fetch('/api/leaderboard');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                displayLeaderboard(data.top || []);
+            } catch (error) {
+                console.error('Error loading leaderboard:', error);
+                displayError('Fehler');
+            }
+        }
+
+        function displayLeaderboard(players) {
+            const leaderboard = document.getElementById('leaderboard');
+            
+            if (!players || players.length === 0) {
+                leaderboard.innerHTML = '<div class="loading">Keine Daten</div>';
+                return;
+            }
+
+            // Nur Top 3 anzeigen
+            const topPlayers = players.slice(0, 3);
+            
+            leaderboard.innerHTML = topPlayers.map((player, index) => {
+                const rank = index + 1;
+                const rankClass = rank === 1 ? 'first' : rank === 2 ? 'second' : 'third';
+                
+                return `
+                    <div class="player">
+                        <span class="rank ${rankClass}">${rank}</span>
+                        <span class="name">${player.display_name || player.username}</span>
+                        <span class="points">${player.points}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function displayError(message) {
+            const leaderboard = document.getElementById('leaderboard');
+            leaderboard.innerHTML = `<div class="error">${message}</div>`;
+        }
+
+        // Initial load
+        loadLeaderboard();
+
+        // Auto-refresh every 30 seconds
+        refreshInterval = setInterval(loadLeaderboard, 30000);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OBS Leaderboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: transparent;
+            color: #ffffff;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        .leaderboard-container {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 16px 20px;
+            min-width: 280px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .title {
+            font-size: 16px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 12px;
+            color: #9146ff;
+            text-shadow: 0 0 10px rgba(145, 70, 255, 0.5);
+        }
+
+        .leaderboard {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .player {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .player:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(2px);
+        }
+
+        .rank {
+            font-weight: 700;
+            font-size: 14px;
+            color: #9146ff;
+            min-width: 20px;
+            text-shadow: 0 0 8px rgba(145, 70, 255, 0.6);
+        }
+
+        .rank.first {
+            color: #ffd700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+        }
+
+        .rank.second {
+            color: #c0c0c0;
+            text-shadow: 0 0 8px rgba(192, 192, 192, 0.6);
+        }
+
+        .rank.third {
+            color: #cd7f32;
+            text-shadow: 0 0 8px rgba(205, 127, 50, 0.6);
+        }
+
+        .name {
+            font-weight: 500;
+            font-size: 13px;
+            color: #ffffff;
+            flex: 1;
+            margin-left: 8px;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .points {
+            font-weight: 600;
+            font-size: 12px;
+            color: #00d4aa;
+            background: rgba(0, 212, 170, 0.1);
+            padding: 2px 8px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            text-shadow: 0 0 6px rgba(0, 212, 170, 0.5);
+        }
+
+        .loading {
+            text-align: center;
+            color: #888;
+            font-size: 14px;
+            padding: 20px;
+        }
+
+        .error {
+            text-align: center;
+            color: #ff4444;
+            font-size: 12px;
+            padding: 10px;
+            background: rgba(255, 68, 68, 0.1);
+            border-radius: 6px;
+            border: 1px solid rgba(255, 68, 68, 0.3);
+        }
+
+        /* Animationen */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .player {
+            animation: fadeIn 0.3s ease forwards;
+        }
+
+        .player:nth-child(1) { animation-delay: 0.1s; }
+        .player:nth-child(2) { animation-delay: 0.2s; }
+        .player:nth-child(3) { animation-delay: 0.3s; }
+        .player:nth-child(4) { animation-delay: 0.4s; }
+        .player:nth-child(5) { animation-delay: 0.5s; }
+
+        /* Responsive */
+        @media (max-width: 400px) {
+            .leaderboard-container {
+                min-width: 240px;
+                padding: 12px 16px;
+            }
+            
+            .title {
+                font-size: 14px;
+            }
+            
+            .name {
+                font-size: 12px;
+            }
+            
+            .points {
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="leaderboard-container">
+        <div class="title">🏆 Leaderboard</div>
+        <div class="leaderboard" id="leaderboard">
+            <div class="loading">Lade Leaderboard...</div>
+        </div>
+    </div>
+
+    <script>
+        let refreshInterval;
+
+        async function loadLeaderboard() {
+            try {
+                const response = await fetch('/api/leaderboard');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                displayLeaderboard(data.top || []);
+            } catch (error) {
+                console.error('Error loading leaderboard:', error);
+                displayError('Fehler beim Laden des Leaderboards');
+            }
+        }
+
+        function displayLeaderboard(players) {
+            const leaderboard = document.getElementById('leaderboard');
+            
+            if (!players || players.length === 0) {
+                leaderboard.innerHTML = '<div class="loading">Keine Daten verfügbar</div>';
+                return;
+            }
+
+            // Nur Top 5 anzeigen
+            const topPlayers = players.slice(0, 5);
+            
+            leaderboard.innerHTML = topPlayers.map((player, index) => {
+                const rank = index + 1;
+                const rankClass = rank === 1 ? 'first' : rank === 2 ? 'second' : rank === 3 ? 'third' : '';
+                
+                return `
+                    <div class="player">
+                        <span class="rank ${rankClass}">#${rank}</span>
+                        <span class="name">${player.display_name || player.username}</span>
+                        <span class="points">${player.points}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function displayError(message) {
+            const leaderboard = document.getElementById('leaderboard');
+            leaderboard.innerHTML = `<div class="error">${message}</div>`;
+        }
+
+        // Initial load
+        loadLeaderboard();
+
+        // Auto-refresh every 30 seconds
+        refreshInterval = setInterval(loadLeaderboard, 30000);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+    </script>
+</body>
+</html>
