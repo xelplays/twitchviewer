@@ -37,6 +37,9 @@ const config = {
   twitchBotAppClientId: process.env.TWITCH_BOT_APP_CLIENT_ID || process.env.TWITCH_BOT_CLIENT_ID || process.env.TWITCH_CLIENT_ID,
   enableEventSub: process.env.ENABLE_EVENTSUB === 'true',
   
+  // Stream Status Configuration
+  streamOfflineCheck: process.env.STREAM_OFFLINE_CHECK !== 'false',
+  
   // OAuth Configuration
   sessionSecret: process.env.SESSION_SECRET || 'your-session-secret-key',
   adminUsers: process.env.ADMIN_USERS ? process.env.ADMIN_USERS.split(',') : ['einfachsven']
@@ -166,6 +169,12 @@ function authenticateAdmin(req, res, next) {
 
 // Helper function to check if stream is live
 async function isStreamLive() {
+  // If stream offline check is disabled, always assume stream is live
+  if (!config.streamOfflineCheck) {
+    console.log('📺 Stream offline check disabled, assuming stream is live');
+    return true;
+  }
+  
   // If no bot access token is configured, assume stream is live to allow chat points
   if (!config.twitchBotAccessToken) {
     console.log('📺 No bot access token configured, assuming stream is live');
@@ -1410,6 +1419,13 @@ async function handleChatMessage({ channel, user, message, msg }) {
       if (!isAdmin) break;
       
       sendChatMessage(`@${username} Anti-Spam Config: Min ${SPAM_CONFIG.MIN_MESSAGE_LENGTH} chars, ${SPAM_CONFIG.CHAT_POINTS_COOLDOWN}s cooldown, max ${SPAM_CONFIG.MAX_MESSAGES_PER_MINUTE} msgs/min, max ${SPAM_CONFIG.MAX_CHAT_POINTS_PER_HOUR} pts/hour`);
+      break;
+      
+    case '!streamconfig':
+      if (!isAdmin) break;
+      
+      const streamStatus = await isStreamLive();
+      sendChatMessage(`@${username} Stream Config: Offline check ${config.streamOfflineCheck ? 'ENABLED' : 'DISABLED'}, Current status: ${streamStatus ? 'LIVE' : 'OFFLINE'}`);
       break;
       
     case '!spamcheck':
