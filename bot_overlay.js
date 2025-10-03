@@ -129,6 +129,75 @@ function authenticateAdmin(req, res, next) {
   next();
 }
 
+// Helper function to check if stream is live
+async function isStreamLive() {
+  try {
+    const response = await fetch(`https://api.twitch.tv/helix/streams?user_login=${config.channel}`, {
+      headers: {
+        'Client-ID': config.twitchBotClientId,
+        'Authorization': `Bearer ${config.twitchBotAccessToken}`
+      }
+    });
+    
+    if (!response.ok) {
+      console.error('Error checking stream status:', response.status);
+      return false;
+    }
+    
+    const data = await response.json();
+    return data.data && data.data.length > 0;
+  } catch (error) {
+    console.error('Error checking stream status:', error);
+    return false;
+  }
+}
+
+// Helper function to check if user is a bot
+async function isUserBot(username) {
+  try {
+    const result = await db.get('SELECT * FROM bot_blacklist WHERE username = ?', [username.toLowerCase()]);
+    return !!result;
+  } catch (error) {
+    console.error('Error checking bot status:', error);
+    return false;
+  }
+}
+
+// Helper function to validate clip ownership
+async function validateClipOwnership(clipUrl, username) {
+  try {
+    // Extract clip ID from URL
+    const clipId = clipUrl.split('/').pop().split('?')[0];
+    
+    // Get clip info from Twitch API
+    const response = await fetch(`https://api.twitch.tv/helix/clips?id=${clipId}`, {
+      headers: {
+        'Client-ID': config.twitchBotClientId,
+        'Authorization': `Bearer ${config.twitchBotAccessToken}`
+      }
+    });
+    
+    if (!response.ok) {
+      console.error('Error fetching clip info:', response.status);
+      return false;
+    }
+    
+    const data = await response.json();
+    if (!data.data || data.data.length === 0) {
+      return false;
+    }
+    
+    const clip = data.data[0];
+    const clipCreator = clip.creator_name.toLowerCase();
+    const usernameLower = username.toLowerCase();
+    
+    return clipCreator === usernameLower;
+  } catch (error) {
+    console.error('Error validating clip ownership:', error);
+    return false;
+  }
+}
+
 // Utility functions
 function getCurrentTimestamp() {
   return Math.floor(Date.now() / 1000);
@@ -266,6 +335,54 @@ app.get('/top10', async (req, res) => {
   } catch (error) {
     console.error('Error fetching top 10:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Bot Management API endpoints
+app.get('/api/admin/bots', authenticateAdmin, async (req, res) => {
+  try {
+    const bots = await db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC');
+    res.json(bots);
+  } catch (error) {
+    console.error('Error fetching bots:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/admin/bots', authenticateAdmin, async (req, res) => {
+  try {
+    const { username, reason } = req.body;
+    
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+
+    const normalizedUsername = username.toLowerCase();
+    const adminKey = req.headers['x-admin-key'] || req.query.admin_key;
+    
+    await db.run(
+      'INSERT OR REPLACE INTO bot_blacklist (username, added_by, added_at, reason) VALUES (?, ?, ?, ?)',
+      [normalizedUsername, 'admin', Date.now(), reason || 'Bot detected']
+    );
+    
+    res.json({ success: true, message: 'Bot added to blacklist' });
+  } catch (error) {
+    console.error('Error adding bot:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.delete('/api/admin/bots/:username', authenticateAdmin, async (req, res) => {
+  try {
+    const { username } = req.params;
+    const normalizedUsername = username.toLowerCase();
+    
+    await db.run('DELETE FROM bot_blacklist WHERE username = ?', [normalizedUsername]);
+    
+    res.json({ success: true, message: 'Bot removed from blacklist' });
+  } catch (error) {
+    console.error('Error removing bot:', error);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
@@ -679,10 +796,24 @@ async function handleChatMessage({ channel, user, message, msg }) {
     display_name: displayName
   });
   
-  // Award chat points (with anti-spam measures) - disabled for testing
+  // Award chat points (with anti-spam measures and live stream check)
   const enableChatPoints = true; // Set to true to enable chat points
   
   if (enableChatPoints) {
+    // Check if user is a bot
+    const isBot = await isUserBot(username);
+    if (isBot) {
+      console.log(`🤖 Bot detected, ignoring chat points: ${username}`);
+      return;
+    }
+    
+    // Check if stream is live
+    const streamLive = await isStreamLive();
+    if (!streamLive) {
+      console.log(`📺 Stream offline, no chat points for: ${username}`);
+      return;
+    }
+    
     const timeSinceLastMessage = now - (user.last_message_ts || 0);
     const timeSinceHourReset = now - (user.chat_points_hour_reset_ts || 0);
     
@@ -697,6 +828,8 @@ async function handleChatMessage({ channel, user, message, msg }) {
       if (chatPointsThisHour < config.maxChatPointsPerHour) {
         chatPointsThisHour += config.pointsPerMessage;
         const newTotal = await addPointsToUser(username, config.pointsPerMessage, 'chat-message');
+        
+        console.log(`📝 Chat points: ${username} +${config.pointsPerMessage} (total: ${newTotal}) - Stream live: ${streamLive}`);
         
         await updateUser(username, {
           last_message_ts: now,
@@ -752,6 +885,13 @@ async function handleChatMessage({ channel, user, message, msg }) {
       const clipUrl = args[1];
       if (!isValidClipUrl(clipUrl)) {
         sendChatMessage( `@${username} Bitte gib eine gültige Twitch Clip URL an!`);
+        break;
+      }
+      
+      // Validate clip ownership
+      const isOwner = await validateClipOwnership(clipUrl, username);
+      if (!isOwner) {
+        sendChatMessage( `@${username} Du kannst nur deine eigenen Clips einreichen!`);
         break;
       }
       
@@ -1097,6 +1237,13 @@ async function updateViewtime() {
     return; // Skip viewtime tracking for testing
   }
   
+  // Check if stream is live before giving viewtime points
+  const streamLive = await isStreamLive();
+  if (!streamLive) {
+    console.log('📺 Stream offline, skipping viewtime tracking');
+    return;
+  }
+  
   try {
     // Get users who have been active in chat (written at least once)
     const chatActiveUsers = await getChatActiveUsers();
@@ -1131,9 +1278,17 @@ async function updateViewtime() {
         remainingViewSeconds -= config.viewtimeSecondsPerPoint;
       }
       
+      // Check if user is a bot before giving viewtime points
+      const isBot = await isUserBot(user.username);
+      if (isBot) {
+        console.log(`🤖 Bot detected, skipping viewtime: ${user.username}`);
+        continue;
+      }
+      
       // Update user with new viewtime and points
       if (pointsToAdd > 0) {
         await addPointsToUser(user.username, pointsToAdd, 'viewtime');
+        console.log(`👀 Viewtime: ${user.username} +${pointsToAdd} (stream live: ${streamLive})`);
       }
       
       await updateUser(user.username, { view_seconds: remainingViewSeconds });

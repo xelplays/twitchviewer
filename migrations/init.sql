@@ -70,4 +70,12 @@ CREATE TABLE IF NOT EXISTS settings (
   setting_value TEXT NOT NULL,
   updated_at INTEGER DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS bot_blacklist (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,        -- lowercase username
+  added_by TEXT,                        -- admin who added the bot
+  added_at INTEGER DEFAULT 0,
+  reason TEXT
+);
 COMMIT;

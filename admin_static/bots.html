@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Management - einfachsven Admin</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #9146ff 0%, #6441a5 100%);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 20px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #ffd700;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 14px;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .nav-link.active {
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            color: white;
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        /* Add Bot Section */
+        .add-bot-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .add-bot-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .add-bot-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #ffd700;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            padding: 12px 15px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .form-group input::placeholder {
+            color: #666;
+        }
+
+        .add-bot-btn {
+            padding: 12px 25px;
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            height: fit-content;
+        }
+
+        .add-bot-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .add-bot-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Bots List */
+        .bots-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .bots-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .bots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .bot-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .bot-card:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .bot-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .bot-username {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #ff6b6b;
+        }
+
+        .remove-bot-btn {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff6b6b;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+            border-radius: 20px;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .remove-bot-btn:hover {
+            background: rgba(255, 0, 0, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .bot-info {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.5;
+        }
+
+        .bot-info div {
+            margin-bottom: 8px;
+        }
+
+        .bot-info strong {
+            color: #ffd700;
+        }
+
+        /* Loading and Error States */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 16px;
+        }
+
+        .error {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255, 0, 0, 0.2);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+            margin: 20px 0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .empty-state h3 {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: #ffd700;
+        }
+
+        .empty-state p {
+            opacity: 0.8;
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            border-left: 4px solid #4caf50;
+            z-index: 2000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.error {
+            border-left-color: #f44336;
+        }
+
+        .toast-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .add-bot-form {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .bots-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-links {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px 15px;
+            }
+
+            .add-bot-section,
+            .bots-section {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <a href="/" class="logo">
+                <i class="fas fa-robot"></i>
+                Bot Management
+            </a>
+            <div class="nav-links">
+                <a href="/admin/clips.html?admin_key=SehrGeheim1234" class="nav-link">
+                    <i class="fas fa-video"></i> Clips
+                </a>
+                <a href="/admin/bots.html?admin_key=SehrGeheim1234" class="nav-link active">
+                    <i class="fas fa-robot"></i> Bots
+                </a>
+                <a href="/" class="nav-link">
+                    <i class="fas fa-home"></i> Home
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Add Bot Section -->
+        <div class="add-bot-section">
+            <div class="add-bot-title">
+                <i class="fas fa-plus-circle"></i>
+                Bot zur Blacklist hinzufügen
+            </div>
+            <form class="add-bot-form" id="addBotForm">
+                <div class="form-group">
+                    <label for="botUsername">Username:</label>
+                    <input type="text" id="botUsername" placeholder="bot_username" required>
+                </div>
+                <div class="form-group">
+                    <label for="botReason">Grund (optional):</label>
+                    <input type="text" id="botReason" placeholder="z.B. Chat-Bot, Spam-Bot...">
+                </div>
+                <button type="submit" class="add-bot-btn" id="addBotBtn">
+                    <i class="fas fa-plus"></i>
+                    Bot hinzufügen
+                </button>
+            </form>
+        </div>
+
+        <!-- Bots List -->
+        <div class="bots-section">
+            <div class="bots-title">
+                <i class="fas fa-list"></i>
+                Bot Blacklist
+                <span id="botCount" class="bot-count">(0 Bots)</span>
+            </div>
+            <div class="bots-list" id="botsList">
+                <div class="loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <br><br>
+                    Lade Bots...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <div class="toast-content">
+            <i class="toast-icon"></i>
+            <span class="toast-message"></span>
+        </div>
+    </div>
+
+    <script>
+        let bots = [];
+
+        // Get admin key from URL
+        function getAdminKey() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('admin_key');
+        }
+
+        // Load bots
+        async function loadBots() {
+            try {
+                const adminKey = getAdminKey();
+                if (!adminKey) {
+                    showError('Admin-Schlüssel fehlt in der URL');
+                    return;
+                }
+
+                const response = await fetch('/api/admin/bots', {
+                    headers: {
+                        'x-admin-key': adminKey
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                bots = await response.json();
+                displayBots();
+            } catch (error) {
+                console.error('Error loading bots:', error);
+                showError('Fehler beim Laden der Bots: ' + error.message);
+            }
+        }
+
+        // Display bots
+        function displayBots() {
+            const container = document.getElementById('botsList');
+            const countElement = document.getElementById('botCount');
+            
+            countElement.textContent = `(${bots.length} Bots)`;
+            
+            if (bots.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3><i class="fas fa-check-circle"></i> Keine Bots blockiert</h3>
+                        <p>Alle Bot-Namen werden normal behandelt.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = bots.map(bot => {
+                const addedDate = new Date(bot.added_at).toLocaleDateString('de-DE');
+                
+                return `
+                    <div class="bot-card">
+                        <div class="bot-header">
+                            <div class="bot-username">${bot.username}</div>
+                            <button class="remove-bot-btn" onclick="removeBot('${bot.username}')">
+                                <i class="fas fa-times"></i> Entfernen
+                            </button>
+                        </div>
+                        <div class="bot-info">
+                            <div><strong>Hinzugefügt von:</strong> ${bot.added_by || 'Admin'}</div>
+                            <div><strong>Datum:</strong> ${addedDate}</div>
+                            ${bot.reason ? `<div><strong>Grund:</strong> ${bot.reason}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = html;
+        }
+
+        // Add bot
+        async function addBot(username, reason) {
+            try {
+                const adminKey = getAdminKey();
+                const response = await fetch('/api/admin/bots', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-admin-key': adminKey
+                    },
+                    body: JSON.stringify({ username, reason })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                showToast('Bot erfolgreich zur Blacklist hinzugefügt!', 'success');
+                document.getElementById('addBotForm').reset();
+                loadBots();
+            } catch (error) {
+                console.error('Error adding bot:', error);
+                showToast('Fehler beim Hinzufügen: ' + error.message, 'error');
+            }
+        }
+
+        // Remove bot
+        async function removeBot(username) {
+            if (!confirm(`Möchtest du "${username}" wirklich von der Blacklist entfernen?`)) {
+                return;
+            }
+
+            try {
+                const adminKey = getAdminKey();
+                const response = await fetch(`/api/admin/bots/${encodeURIComponent(username)}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'x-admin-key': adminKey
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                showToast('Bot erfolgreich von der Blacklist entfernt!', 'success');
+                loadBots();
+            } catch (error) {
+                console.error('Error removing bot:', error);
+                showToast('Fehler beim Entfernen: ' + error.message, 'error');
+            }
+        }
+
+        // Show error
+        function showError(message) {
+            const container = document.getElementById('botsList');
+            container.innerHTML = `
+                <div class="error">
+                    ❌ ${message}<br>
+                    <small>Versuche es später erneut</small>
+                </div>
+            `;
+        }
+
+        // Show toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
+            
+            toast.innerHTML = `
+                <div class="toast-content">
+                    <i class="${icon}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            toast.className = `toast ${type} show`;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Event listeners
+        document.getElementById('addBotForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('botUsername').value.trim();
+            const reason = document.getElementById('botReason').value.trim();
+            
+            if (!username) {
+                showToast('Username ist erforderlich!', 'error');
+                return;
+            }
+
+            const addBtn = document.getElementById('addBotBtn');
+            addBtn.disabled = true;
+            addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Hinzufügen...';
+
+            try {
+                await addBot(username, reason);
+            } finally {
+                addBtn.disabled = false;
+                addBtn.innerHTML = '<i class="fas fa-plus"></i> Bot hinzufügen';
+            }
+        });
+
+        // Initial load
+        loadBots();
+    </script>
+</body>
+</html>
