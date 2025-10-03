@@ -170,7 +170,11 @@ async function isUserBot(username) {
     }
     
     // Only consider it a bot if there's actually a valid username in the result
-    return !!(result && result.username && result.username.trim().length > 0);
+    // Check if result exists AND has a username field AND it's not empty
+    const isValidBot = !!(result && result.username && typeof result.username === 'string' && result.username.trim().length > 0);
+    console.log(`🔍 Valid bot check result:`, isValidBot);
+    
+    return isValidBot;
   } catch (error) {
     console.error('Error checking bot status:', error);
     return false;
@@ -1090,6 +1094,30 @@ async function handleChatMessage({ channel, user, message, msg }) {
            sendChatMessage( `@${username} ${botUsername} wurde von der Bot-Blacklist entfernt! (${this.changes} Einträge entfernt)`);
          } else {
            sendChatMessage( `@${username} ${botUsername} war nicht in der Blacklist.`);
+         }
+       });
+       break;
+       
+     case '!botremove':
+       if (!isAdmin) break;
+       
+       if (args.length < 2) {
+         sendChatMessage( `@${username} Usage: !botremove <username>`);
+         break;
+       }
+       
+       const userToRemove = args[1].toLowerCase();
+       db.run('DELETE FROM bot_blacklist WHERE username = ?', [userToRemove], function(err) {
+         if (err) {
+           console.error('Error removing bot:', err);
+           sendChatMessage( `@${username} Fehler beim Entfernen von ${userToRemove}!`);
+           return;
+         }
+         
+         if (this.changes > 0) {
+           sendChatMessage( `@${username} ${userToRemove} wurde von der Bot-Blacklist entfernt! (${this.changes} Einträge entfernt)`);
+         } else {
+           sendChatMessage( `@${username} ${userToRemove} war nicht in der Blacklist.`);
          }
        });
        break;
