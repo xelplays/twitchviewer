@@ -161,6 +161,7 @@ async function isStreamLive() {
 async function isUserBot(username) {
   try {
     const result = await db.get('SELECT * FROM bot_blacklist WHERE username = ?', [username.toLowerCase()]);
+    console.log(`🔍 Bot check for ${username}:`, result ? 'FOUND IN BLACKLIST' : 'NOT FOUND');
     return !!result;
   } catch (error) {
     console.error('Error checking bot status:', error);
@@ -1016,6 +1017,30 @@ async function handleChatMessage({ channel, user, message, msg }) {
           sendChatMessage( `@${username} ${botToRemove} wurde von der Bot-Blacklist entfernt!`);
         } else {
           sendChatMessage( `@${username} ${botToRemove} war nicht in der Blacklist.`);
+        }
+      });
+      break;
+      
+    case '!botcheck':
+      if (!isAdmin) break;
+      
+      if (args.length < 2) {
+        sendChatMessage( `@${username} Usage: !botcheck <username>`);
+        break;
+      }
+      
+      const userToCheck = args[1].toLowerCase();
+      db.get('SELECT * FROM bot_blacklist WHERE username = ?', [userToCheck], (err, row) => {
+        if (err) {
+          console.error('Error checking bot status:', err);
+          sendChatMessage( `@${username} Fehler beim Überprüfen von ${userToCheck}!`);
+          return;
+        }
+        
+        if (row) {
+          sendChatMessage( `@${username} ${userToCheck} ist in der Bot-Blacklist (Grund: ${row.reason || 'Bot'})`);
+        } else {
+          sendChatMessage( `@${username} ${userToCheck} ist NICHT in der Bot-Blacklist`);
         }
       });
       break;
