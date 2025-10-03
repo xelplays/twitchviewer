@@ -174,27 +174,31 @@ async function isStreamLive() {
 }
 
 // Helper function to check if user is a bot
-async function isUserBot(username) {
-  try {
-    const result = await db.get('SELECT * FROM bot_blacklist WHERE username = ?', [username.toLowerCase()]);
-    console.log(`🔍 Bot check for ${username}:`, result ? 'FOUND IN BLACKLIST' : 'NOT FOUND');
-    if (result) {
-      console.log(`🔍 Bot details:`, result);
-      console.log(`🔍 Bot details JSON:`, JSON.stringify(result));
-      console.log(`🔍 Bot username field:`, result.username);
-      console.log(`🔍 Bot username length:`, result.username ? result.username.length : 'null/undefined');
-    }
-    
-    // Only consider it a bot if there's actually a valid username in the result
-    // Check if result exists AND has a username field AND it's not empty
-    const isValidBot = !!(result && result.username && typeof result.username === 'string' && result.username.trim().length > 0);
-    console.log(`🔍 Valid bot check result:`, isValidBot);
-    
-    return isValidBot;
-  } catch (error) {
-    console.error('Error checking bot status:', error);
-    return false;
-  }
+function isUserBot(username) {
+  return new Promise((resolve) => {
+    db.get('SELECT * FROM bot_blacklist WHERE username = ?', [username.toLowerCase()], (err, result) => {
+      if (err) {
+        console.error('Error checking bot status:', err);
+        resolve(false);
+        return;
+      }
+      
+      console.log(`🔍 Bot check for ${username}:`, result ? 'FOUND IN BLACKLIST' : 'NOT FOUND');
+      if (result) {
+        console.log(`🔍 Bot details:`, result);
+        console.log(`🔍 Bot details JSON:`, JSON.stringify(result));
+        console.log(`🔍 Bot username field:`, result.username);
+        console.log(`🔍 Bot username length:`, result.username ? result.username.length : 'null/undefined');
+      }
+      
+      // Only consider it a bot if there's actually a valid username in the result
+      // Check if result exists AND has a username field AND it's not empty
+      const isValidBot = !!(result && result.username && typeof result.username === 'string' && result.username.trim().length > 0);
+      console.log(`🔍 Valid bot check result:`, isValidBot);
+      
+      resolve(isValidBot);
+    });
+  });
 }
 
 // Helper function to validate clip ownership
@@ -373,57 +377,82 @@ app.get('/top10', async (req, res) => {
 });
 
 // Bot Management API endpoints
-app.get('/api/admin/bots', authenticateAdmin, async (req, res) => {
-  try {
-    const bots = await db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC');
+app.get('/api/admin/bots', authenticateAdmin, (req, res) => {
+  db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC', (err, bots) => {
+    if (err) {
+      console.error('Error fetching bots:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
     console.log('🔍 API /api/admin/bots - Found bots:', bots);
     console.log('🔍 API /api/admin/bots - Bots count:', bots.length);
     res.json(bots);
-  } catch (error) {
-    console.error('Error fetching bots:', error);
-    res.status(500).json({ error: 'Database error' });
-  }
+  });
 });
 
 // Debug endpoint to check database directly
-app.get('/api/admin/bots/debug', authenticateAdmin, async (req, res) => {
-  try {
-    // Check if table exists
-    const tableCheck = await db.all("SELECT name FROM sqlite_master WHERE type='table' AND name='bot_blacklist'");
-    console.log('🔍 Debug - Table exists:', tableCheck);
-    
-    // Get table schema
-    const schema = await db.all("PRAGMA table_info(bot_blacklist)");
-    console.log('🔍 Debug - Table schema:', schema);
-    
-    // Try to get all bots
-    const allBots = await db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC');
-    console.log('🔍 Debug - All bots:', allBots);
-    
-    // Try to get empty bots
-    const emptyBots = await db.all('SELECT * FROM bot_blacklist WHERE username IS NULL OR username = "" OR TRIM(username) = ""');
-    console.log('🔍 Debug - Empty bots:', emptyBots);
-    
-    // Try to get valid bots
-    const validBots = await db.all('SELECT * FROM bot_blacklist WHERE username IS NOT NULL AND username != "" AND TRIM(username) != ""');
-    console.log('🔍 Debug - Valid bots:', validBots);
-    
-    res.json({
-      tableExists: tableCheck.length > 0,
-      tableSchema: schema,
-      allBots: allBots,
-      emptyBots: emptyBots,
-      validBots: validBots,
-      counts: {
-        total: allBots.length,
-        empty: emptyBots.length,
-        valid: validBots.length
-      }
-    });
-  } catch (error) {
-    console.error('Error in debug endpoint:', error);
-    res.status(500).json({ error: 'Database error: ' + error.message });
+app.get('/api/admin/bots/debug', authenticateAdmin, (req, res) => {
+  let results = {};
+  let completed = 0;
+  const totalQueries = 5;
+  
+  function checkComplete() {
+    completed++;
+    if (completed === totalQueries) {
+      console.log('🔍 Debug - All results:', results);
+      res.json({
+        tableExists: results.tableCheck.length > 0,
+        tableSchema: results.schema,
+        allBots: results.allBots,
+        emptyBots: results.emptyBots,
+        validBots: results.validBots,
+        counts: {
+          total: results.allBots.length,
+          empty: results.emptyBots.length,
+          valid: results.validBots.length
+        }
+      });
+    }
   }
+  
+  // Check if table exists
+  db.all("SELECT name FROM sqlite_master WHERE type='table' AND name='bot_blacklist'", (err, tableCheck) => {
+    if (err) console.error('Error checking table:', err);
+    results.tableCheck = tableCheck || [];
+    console.log('🔍 Debug - Table exists:', tableCheck);
+    checkComplete();
+  });
+  
+  // Get table schema
+  db.all("PRAGMA table_info(bot_blacklist)", (err, schema) => {
+    if (err) console.error('Error getting schema:', err);
+    results.schema = schema || [];
+    console.log('🔍 Debug - Table schema:', schema);
+    checkComplete();
+  });
+  
+  // Get all bots
+  db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC', (err, allBots) => {
+    if (err) console.error('Error getting all bots:', err);
+    results.allBots = allBots || [];
+    console.log('🔍 Debug - All bots:', allBots);
+    checkComplete();
+  });
+  
+  // Get empty bots
+  db.all('SELECT * FROM bot_blacklist WHERE username IS NULL OR username = "" OR TRIM(username) = ""', (err, emptyBots) => {
+    if (err) console.error('Error getting empty bots:', err);
+    results.emptyBots = emptyBots || [];
+    console.log('🔍 Debug - Empty bots:', emptyBots);
+    checkComplete();
+  });
+  
+  // Get valid bots
+  db.all('SELECT * FROM bot_blacklist WHERE username IS NOT NULL AND username != "" AND TRIM(username) != ""', (err, validBots) => {
+    if (err) console.error('Error getting valid bots:', err);
+    results.validBots = validBots || [];
+    console.log('🔍 Debug - Valid bots:', validBots);
+    checkComplete();
+  });
 });
 
 // Test endpoint to add a bot manually
