@@ -374,6 +374,7 @@ async function validateClipOwnership(clipUrl, username) {
   try {
     // Extract clip ID from URL
     const clipId = clipUrl.split('/').pop().split('?')[0];
+    console.log(`🔍 Clip ID extracted: ${clipId}`);
     
     // Get clip info from Twitch API
     const response = await fetch(`https://api.twitch.tv/helix/clips?id=${clipId}`, {
@@ -383,13 +384,19 @@ async function validateClipOwnership(clipUrl, username) {
       }
     });
     
+    console.log(`🔍 Twitch API response status: ${response.status}`);
+    
     if (!response.ok) {
       console.error('Error fetching clip info:', response.status);
+      console.log(`🔍 API Error - returning false for clip ownership validation`);
       return false;
     }
     
     const data = await response.json();
+    console.log(`🔍 Clip data received:`, data);
+    
     if (!data.data || data.data.length === 0) {
+      console.log(`🔍 No clip data found - returning false`);
       return false;
     }
     
@@ -397,9 +404,13 @@ async function validateClipOwnership(clipUrl, username) {
     const clipCreator = clip.creator_name.toLowerCase();
     const usernameLower = username.toLowerCase();
     
+    console.log(`🔍 Clip creator: ${clipCreator}, Username: ${usernameLower}`);
+    console.log(`🔍 Ownership match: ${clipCreator === usernameLower}`);
+    
     return clipCreator === usernameLower;
   } catch (error) {
     console.error('Error validating clip ownership:', error);
+    console.log(`🔍 Exception - returning false for clip ownership validation`);
     return false;
   }
 }
@@ -1187,7 +1198,9 @@ async function handleChatMessage({ channel, user, message, msg }) {
       }
       
       // Validate clip ownership
+      console.log(`🔍 Validating clip ownership for ${username}: ${clipUrl}`);
       const isOwner = await validateClipOwnership(clipUrl, username);
+      console.log(`🔍 Clip ownership validation result: ${isOwner}`);
       if (!isOwner) {
         sendChatMessage( `@${username} Du kannst nur deine eigenen Clips einreichen!`);
         break;
@@ -1226,13 +1239,7 @@ async function handleChatMessage({ channel, user, message, msg }) {
               return;
             }
             
-            // Validate that the user is the creator of the clip (basic check)
-            if (!validateClipOwnership(clipUrl, username)) {
-              sendChatMessage( `@${username} Du kannst nur deine eigenen Clips einreichen!`);
-              return;
-            }
-            
-            // Submit clip
+            // Submit clip (ownership already validated above)
             const clipId = extractClipId(clipUrl);
             const now = Date.now();
             db.run(
