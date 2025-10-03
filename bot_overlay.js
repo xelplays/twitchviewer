@@ -899,6 +899,98 @@ async function handleChatMessage({ channel, user, message, msg }) {
     display_name: displayName
   });
   
+  // Parse commands first (commands should always work regardless of stream status)
+  const args = message.trim().split(' ');
+  const command = args[0].toLowerCase();
+  
+  console.log(`🔍 Parsed command: "${command}" from message: "${message}"`);
+  
+  // Handle commands first
+  if (command.startsWith('!')) {
+    switch (command) {
+      case '!punkte':
+      case '!points':
+        console.log(`🎯 Processing !points command from ${username}`);
+        const userPoints = await getUser(username);
+        console.log(`🎯 User points data:`, userPoints);
+        sendChatMessage( `@${username} hat ${userPoints.points} Punkte! 🎯`);
+        return; // Exit after handling command
+        
+      case '!top':
+      case '!leaderboard':
+        try {
+          console.log(`🏆 Processing !top command from ${username}`);
+          const topUsers = await getTopUsers(5);
+          const leaderboard = topUsers.map((user, index) => 
+            `${index + 1}. ${user.display_name || user.username}: ${user.points}`
+          ).join(' | ');
+          sendChatMessage( `🏆 Top 5: ${leaderboard}`);
+        } catch (error) {
+          console.error('Error fetching leaderboard:', error);
+        }
+        return; // Exit after handling command
+        
+      case '!botlist':
+        if (!isAdmin) break;
+        
+        db.all('SELECT username, reason, added_at FROM bot_blacklist ORDER BY added_at DESC LIMIT 10', (err, rows) => {
+          if (err) {
+            console.error('Error fetching bot list:', err);
+            return;
+          }
+          
+          if (rows.length === 0) {
+            sendChatMessage( `@${username} Keine Bots in der Blacklist.`);
+          } else {
+            const botsList = rows.map(bot => `${bot.username} (${bot.reason || 'Bot'})`).join(', ');
+            sendChatMessage( `@${username} Bot Blacklist: ${botsList}`);
+          }
+        });
+        return; // Exit after handling command
+        
+      case '!botdebug':
+        if (!isAdmin) break;
+        
+        db.all('SELECT * FROM bot_blacklist ORDER BY added_at DESC', (err, allBots) => {
+          if (err) {
+            console.error('Error getting all bots:', err);
+            sendChatMessage( `@${username} Fehler beim Abrufen der Bot-Liste!`);
+            return;
+          }
+          
+          const botList = allBots.map(bot => `${bot.username} (${bot.reason})`).join(', ');
+          sendChatMessage( `@${username} Alle Bots in DB: ${botList || 'Keine'}`);
+          
+          const currentUserInList = allBots.find(bot => bot.username === username.toLowerCase());
+          if (currentUserInList) {
+            sendChatMessage( `@${username} Du bist in der Liste: ${currentUserInList.username} (${currentUserInList.reason})`);
+          } else {
+            sendChatMessage( `@${username} Du bist NICHT in der Bot-Liste!`);
+          }
+        });
+        return; // Exit after handling command
+        
+      case '!botfix':
+        if (!isAdmin) break;
+        
+        const botUsername = username.toLowerCase();
+        db.run('DELETE FROM bot_blacklist WHERE username = ?', [botUsername], function(err) {
+          if (err) {
+            console.error('Error removing bot:', err);
+            sendChatMessage( `@${username} Fehler beim Entfernen von ${botUsername}!`);
+            return;
+          }
+          
+          if (this.changes > 0) {
+            sendChatMessage( `@${username} ${botUsername} wurde von der Bot-Blacklist entfernt! (${this.changes} Einträge entfernt)`);
+          } else {
+            sendChatMessage( `@${username} ${botUsername} war nicht in der Blacklist.`);
+          }
+        });
+        return; // Exit after handling command
+    }
+  }
+  
   // Award chat points (with anti-spam measures and live stream check)
   const enableChatPoints = true; // Set to true to enable chat points
   
@@ -942,24 +1034,10 @@ async function handleChatMessage({ channel, user, message, msg }) {
       }
     }
   }
-  
-  // Parse commands
-  const args = message.trim().split(' ');
-  const command = args[0].toLowerCase();
-  
-  switch (command) {
-    case '!punkte':
-    case '!points':
-      console.log(`🎯 Processing !points command from ${username}`);
-      const userPoints = await getUser(username);
-      console.log(`🎯 User points data:`, userPoints);
-      sendChatMessage( `@${username} hat ${userPoints.points} Punkte! 🎯`);
-      break;
-      
-    case '!top':
-    case '!leaderboard':
-      try {
-        const topUsers = await getTopUsers(5);
+}
+
+// Database utility functions
+function getUser(username) {
         const leaderboard = topUsers.map((user, index) => 
           `${index + 1}. ${user.display_name || user.username}: ${user.points}`
         ).join(' | ');
