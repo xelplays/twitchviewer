@@ -443,7 +443,13 @@
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
-                bots = await response.json();
+                const responseData = await response.json();
+                console.log('API Response:', responseData);
+                
+                // Ensure we have an array
+                bots = Array.isArray(responseData) ? responseData : [];
+                console.log('Processed bots array:', bots);
+                
                 displayBots();
             } catch (error) {
                 console.error('Error loading bots:', error);
@@ -455,6 +461,13 @@
         function displayBots() {
             const container = document.getElementById('botsList');
             const countElement = document.getElementById('botCount');
+            
+            // Check if bots is an array
+            if (!Array.isArray(bots)) {
+                console.error('Bots is not an array:', bots);
+                showError('Fehler: Ungültige Daten vom Server erhalten');
+                return;
+            }
             
             countElement.textContent = `(${bots.length} Bots)`;
             
