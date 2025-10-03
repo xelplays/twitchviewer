@@ -32,6 +32,7 @@ const config = {
   twitchClientId: process.env.TWITCH_CLIENT_ID,
   twitchClientSecret: process.env.TWITCH_CLIENT_SECRET,
   twitchBotClientId: process.env.TWITCH_BOT_CLIENT_ID || process.env.TWITCH_CLIENT_ID,
+  twitchBotAccessToken: process.env.TWITCH_BOT_APP_ACCESS_TOKEN || process.env.TWITCH_CLIENT_SECRET,
   twitchBotAppAccessToken: process.env.TWITCH_BOT_APP_ACCESS_TOKEN,
   twitchBotAppClientId: process.env.TWITCH_BOT_APP_CLIENT_ID || process.env.TWITCH_BOT_CLIENT_ID || process.env.TWITCH_CLIENT_ID,
   enableEventSub: process.env.ENABLE_EVENTSUB === 'true',
@@ -152,6 +153,12 @@ function authenticateAdmin(req, res, next) {
 
 // Helper function to check if stream is live
 async function isStreamLive() {
+  // If no bot access token is configured, assume stream is live to allow chat points
+  if (!config.twitchBotAccessToken) {
+    console.log('📺 No bot access token configured, assuming stream is live');
+    return true;
+  }
+  
   try {
     const response = await fetch(`https://api.twitch.tv/helix/streams?user_login=${config.channel}`, {
       headers: {
@@ -162,14 +169,16 @@ async function isStreamLive() {
     
     if (!response.ok) {
       console.error('Error checking stream status:', response.status);
-      return false;
+      // If API fails, assume stream is live to allow chat points
+      return true;
     }
     
     const data = await response.json();
     return data.data && data.data.length > 0;
   } catch (error) {
     console.error('Error checking stream status:', error);
-    return false;
+    // If API fails, assume stream is live to allow chat points
+    return true;
   }
 }
 
